@@ -65,8 +65,10 @@ Pick the first path that works:
    ```bash
    python "${CLAUDE_SKILL_DIR}/scripts/trends_cli.py" check --terms "air fryer" "multicooker" --geo UA --sources web shopping
    ```
-2. **Browser mode** - Claude opens the explore page in a browser tool and saves the widget JSON, then runs `ingest`. See [browser-mode.md](references/browser-mode.md).
-3. **Manual CSV** - the user exports CSV files from trends.google.com and you run `import-csv`. This is the dependable fallback because Google often returns HTTP 429 to automated clients. See [cli-mode.md](references/cli-mode.md).
+2. **Browser mode with the user's Chrome** (Claude in Chrome) - Google often returns HTTP 429 to automated browsers and to built-in browser panes while the user's own Chrome works. Claude opens the explore page, runs a short snippet, saves the result and runs `ingest --compact`. See [browser-mode.md](references/browser-mode.md).
+3. **Manual CSV** - the user exports CSV files from trends.google.com and you run `import-csv`. The fallback that needs no browser tool. See [cli-mode.md](references/cli-mode.md).
+
+If the CLI reports `BLOCKED`, go straight to 2 or 3: do not retry.
 
 Run `python .../trends_cli.py <command> --help` for flags instead of guessing. URL parameters: [url-parameters.md](references/url-parameters.md).
 

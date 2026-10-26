@@ -41,7 +41,9 @@ class ParseError(ValueError):
 def strip_xssi(text: str) -> str:
     text = text.lstrip("﻿").lstrip()
     if text.startswith(XSSI_PREFIX):
-        text = text[len(XSSI_PREFIX):]
+        text = text[len(XSSI_PREFIX):].lstrip()
+        if text.startswith(","):  # the real prefix is ")]}'," followed by a newline
+            text = text[1:]
     return text.lstrip()
 
 

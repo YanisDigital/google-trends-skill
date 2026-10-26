@@ -14,7 +14,7 @@ python -m playwright install chromium
 | Command | Purpose |
 |---|---|
 | `check --terms A B --geo UA --date "today 5-y" --sources web shopping` | open the explore page, record the widget data, analyse, report |
-| `ingest --raw DIR --terms A B --geo UA` | build a snapshot from raw widget JSON saved in [browser mode](browser-mode.md) |
+| `ingest --compact web.compact.json [shopping.compact.json] --terms A B --geo UA` | build a snapshot from the compact JSON that the [browser mode](browser-mode.md) snippet returns (`--raw DIR` takes raw widget files instead) |
 | `import-csv --web-timeline f.csv [--shopping-timeline f.csv] [--regions f.csv] [--related "A=f.csv"]` | build a snapshot from CSV files exported by hand |
 | `report SNAPSHOT.json` | re-render reports from a saved snapshot |
 | `trending --geo UA` | "Trending now" from the public RSS feed |
@@ -34,7 +34,7 @@ Exit codes: `0` ok, `2` invalid input or unreadable file, `3` blocked by Google 
 
 ## When blocked (HTTP 429, consent page, CAPTCHA)
 
-Automated clients get HTTP 429 from the explore page often, depending on the network. Do not retry in a loop. Tell the user, and use manual CSV:
+Automated clients get HTTP 429 from the explore page often, even when the same page opens fine in the user's own Chrome. Do not retry in a loop. Tell the user and either use [browser mode](browser-mode.md) with Claude in Chrome (the user's real browser), or manual CSV:
 
 1. Open the explore page yourself with `hl=en` in the URL (see [url-parameters.md](url-parameters.md)).
 2. For web search, click the download arrow on **Interest over time** and save `multiTimeline.csv`.

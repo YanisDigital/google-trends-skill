@@ -58,7 +58,7 @@ python skills/google-trends/scripts/trends_cli.py trending --geo UA
 python skills/google-trends/scripts/trends_cli.py import-csv --web-timeline multiTimeline.csv --geo UA
 ```
 
-Three ways to get the data, in order of preference: the CLI (Playwright), Claude driving a browser tool, or CSV files you export by hand from trends.google.com. Google often answers automated clients with HTTP 429; when that happens the tools stop and ask for CSV files instead of trying to get around the block.
+Three ways to get the data: the CLI (Playwright), Claude driving **your own Chrome** through Claude in Chrome, or CSV files you export by hand from trends.google.com. Google often answers automated browsers with HTTP 429 even when the page opens fine in your Chrome; the CLI then stops after one retry and points to the other two ways instead of trying to get around the block.
 
 Results go to `./google-trends-output/` (git-ignored). Run the same query later and the report ends with "Changes since <date>".
 
@@ -82,7 +82,7 @@ This is for personal, low-volume research (a handful of queries at a time). Auto
 - Trends gives relative interest, so no volumes, sales or revenue; narrow queries and small markets often have no data.
 - Impulse products bought from TikTok or Reels are not searched for; use Meta Ad Library and TikTok Creative Center.
 - Rising interest does not guarantee margin.
-- The page and API formats are Google's and can change. The parsers are covered by tests on synthetic fixtures; live collection is best effort.
+- The page and API formats are Google's and can change (Google has announced a new Trends experience). Tests run offline on synthetic fixtures. Browser mode with Claude in Chrome was verified end to end on real data (one and two terms); the Playwright collector was not, because Google returned 429 to it in every test.
 
 ## Development
 

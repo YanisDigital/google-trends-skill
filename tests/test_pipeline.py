@@ -174,3 +174,82 @@ def test_cli_refuses_huge_input(tmp_path):
     with pytest.raises(ValueError):
         trends_cli._read_text(str(big))
     assert isinstance(Path(trends_cli.__file__), Path)
+
+
+def test_compact_matches_raw_pipeline(tmp_path):
+    raw = FIXTURES / "raw" / "web"
+    ml = json.loads((raw / "multiline.json").read_text().split(chr(10), 1)[1])["default"]["timelineData"]
+    geo = json.loads((raw / "comparedgeo.json").read_text().split(chr(10), 1)[1])["default"]["geoMapData"]
+    rel = json.loads((raw / "related_0.json").read_text().split(chr(10), 1)[1])["default"]["rankedList"]
+    compact_obj = {
+        "source": "web", "t0": int(ml[0]["time"]), "step": 604800, "partial_last": True,
+        "series": [[r["value"][0] for r in ml], [r["value"][1] for r in ml]],
+        "regions": [{"code": g["geoCode"], "name": g["geoName"], "values": g["value"]} for g in geo],
+        "related": [{"top": [[k["query"], k["value"], k["formattedValue"]] for k in rel[0]["rankedKeyword"]],
+                     "rising": [[k["query"], k["value"], k["formattedValue"]] for k in rel[1]["rankedKeyword"]]}],
+    }
+    f = tmp_path / "web.json"
+    f.write_text(json.dumps(compact_obj), encoding="utf-8")
+    code = trends_cli.main(["ingest", "--compact", str(f), "--terms", "acme widget", "gadget", "--geo", "UA",
+                            "--out", str(tmp_path / "out"), "--formats", "md"])
+    assert code == 0
+    snap_file = next((tmp_path / "out" / "history").rglob("*.json"))
+    new = json.loads(snap_file.read_text(encoding="utf-8"))
+    old = ingest_raw(FIXTURES / "raw", ["acme widget", "gadget"], ["UA"], "today 5-y", "browser")
+    assert new["sources"]["web"] == old["sources"]["web"]
+
+
+@pytest.mark.parametrize("bad", [
+    {"source": "tiktok"},
+    {"series": [[1, 2], [1]], "t0": 1, "step": 1},
+    {"series": [[1, "x"]], "t0": 1, "step": 1},
+    {"series": [[1, 2]]},
+    {"series": [[1, 2]], "t0": 1, "step": 0},
+    {"series": [[1] * 6]},
+])
+def test_compact_rejects_bad_input(bad, tmp_path):
+    from gtrends import compact
+    from gtrends.parse import ParseError
+    with pytest.raises(ParseError):
+        compact.expand(bad, tmp_path)
+
+
+def test_cli_ingest_needs_exactly_one_input(tmp_path):
+    assert trends_cli.main(["ingest", "--terms", "a", "--out", str(tmp_path)]) == 2
+
+
+def test_growing_with_stalling_momentum_is_flagged():
+    shape = {"shape": "growing", "reasons": [], "momentum_3m": 0.75}
+    v = A_verdict(shape)
+    assert any("stalling" in r for r in v["reasons"])
+    assert not any("stalling" in r for r in A_verdict({"shape": "growing", "reasons": [], "momentum_3m": 1.1})["reasons"])
+
+
+def A_verdict(shape):  # noqa: N802
+    from gtrends.analyze import verdict
+    return verdict(shape, {"status": "confirmed"}, None, 0)
+
+
+def test_compact_string_encoding_equals_list_encoding(tmp_path):
+    from gtrends import compact
+    as_lists = {"series": [[1, 2, 3]], "t0": 1635033600, "step": 604800,
+                "regions": [{"code": "UA-30", "name": "Kyiv city", "values": [100]}],
+                "related": [{"top": [["a", 5, "5"]], "rising": [["b", 9000, "Breakout"]]}]}
+    as_strings = {"series": ["1,2,3"], "t0": 1635033600, "step": 604800,
+                  "regions": "UA-30|Kyiv city|100", "related": [{"top": "a|5|5", "rising": "b|9000|Breakout"}]}
+    compact.expand(as_lists, tmp_path / "x")
+    compact.expand(as_strings, tmp_path / "y")
+    for name in ("multiline.json", "comparedgeo.json", "related_0.json"):
+        assert (tmp_path / "x/web" / name).read_text(encoding="utf-8") == (tmp_path / "y/web" / name).read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("bad", [
+    {"series": ["1,x"], "t0": 1, "step": 1},
+    {"regions": "only|two"},
+    {"related": [{"top": "a|b"}]},
+])
+def test_compact_rejects_bad_strings(bad, tmp_path):
+    from gtrends import compact
+    from gtrends.parse import ParseError
+    with pytest.raises(ParseError):
+        compact.expand(bad, tmp_path)

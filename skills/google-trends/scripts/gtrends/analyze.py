@@ -24,6 +24,7 @@ DECLINE_VS_FIRST = 0.75
 DECLINE_VS_PREV = 0.95
 SWAMPED_SHARE = 0.08          # a term below 8% of the leader is "swamped"
 AD_LEAD_DAYS = (42, 21)       # start ads 3-6 weeks before the peak (guide, task 2)
+MOMENTUM_STALL = 0.8          # last 3 months vs the previous 3: at or below this is a warning
 INTENT_CORR_OK = 0.6
 INTENT_CORR_WEAK = 0.3
 
@@ -341,6 +342,9 @@ def verdict(shape_info: dict, intent: dict, regions: dict | None, rising_count: 
         label = "go_validate"
     else:  # stable
         label = "test_small"
+    momentum = shape_info.get("momentum_3m")
+    if shape == "growing" and momentum is not None and momentum <= MOMENTUM_STALL:
+        reasons.append(f"watch: the last 3 months are {round((1 - momentum) * 100)}% below the 3 months before; check whether the rise is stalling")
     if intent.get("status") == "weak" and label == "go_validate":
         label = "test_small"
         reasons.append("Google Shopping does not confirm buying intent")

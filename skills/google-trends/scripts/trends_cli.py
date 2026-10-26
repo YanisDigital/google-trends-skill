@@ -2,7 +2,7 @@
 """Command line entry point for the google-trends skill.
 
   check       fetch via Playwright, analyse, write reports, save history
-  ingest      build a snapshot from raw widget JSON (browser mode) and report
+  ingest      build a snapshot from raw widget JSON or compact JSON (browser mode) and report
   import-csv  build a snapshot from CSV files exported by hand from Trends and report
   report      re-render reports from a saved snapshot
   trending    "Trending now" from the public RSS feed
@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from gtrends import history, report_html, report_md, report_tables, trending  # noqa: E402
+from gtrends import compact, history, report_html, report_md, report_tables, trending  # noqa: E402
 from gtrends.analyze import analyze_snapshot  # noqa: E402
 from gtrends.fetch_playwright import BlockedError, fetch, validate_inputs  # noqa: E402
 from gtrends.ingest import ingest_raw  # noqa: E402
@@ -93,8 +93,17 @@ def cmd_check(a: argparse.Namespace) -> int:
 
 
 def cmd_ingest(a: argparse.Namespace) -> int:
-    snap = ingest_raw(Path(a.raw), a.terms, a.geo, a.date, "browser", a.category)
-    return finish(snap, Path(a.out), _formats(a.formats))
+    out = Path(a.out)
+    if bool(a.raw) == bool(a.compact):
+        raise ValueError("give exactly one of --raw DIR or --compact FILE [FILE ...]")
+    if a.compact:
+        raw = safe_join(out, "raw", history.slugify(" ".join(a.terms) + " ".join(a.geo) + a.date), date.today().isoformat())
+        for f in a.compact:
+            compact.expand(json.loads(_read_text(f)), raw)
+    else:
+        raw = Path(a.raw)
+    snap = ingest_raw(raw, a.terms, a.geo, a.date, "browser", a.category)
+    return finish(snap, out, _formats(a.formats))
 
 
 def cmd_import_csv(a: argparse.Namespace) -> int:
@@ -147,7 +156,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     i = sub.add_parser("ingest", help="build a snapshot from raw widget JSON saved in browser mode")
     common(i)
-    i.add_argument("--raw", required=True, help="folder with <source>/multiline.json etc.")
+    i.add_argument("--raw", help="folder with <source>/multiline.json etc.")
+    i.add_argument("--compact", nargs="+", help="compact JSON file(s) from the browser snippet, one per source")
     i.add_argument("--terms", nargs="+", required=True)
     i.add_argument("--category", type=int, default=0)
     i.set_defaults(fn=cmd_ingest)
