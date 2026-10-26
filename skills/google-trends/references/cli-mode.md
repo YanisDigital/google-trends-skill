@@ -27,7 +27,7 @@ Exit codes: `0` ok, `2` invalid input or unreadable file, `3` blocked by Google 
 ## What `check` does and does not do
 
 - Opens `trends.google.com/trends/explore?...&hl=en` once per source in a fresh, throwaway browser profile.
-- Blocks every request that is not to Google, and images, media and fonts.
+- Blocks every request that is not to Google, and images, media and fonts. Service workers are blocked (their requests would bypass the filter) and downloads are refused.
 - Records the three data responses the page itself requests (time series, regions, related queries). No private endpoints, no tokens of its own.
 - Waits at least 5 seconds between pages, retries once after a 429, then stops.
 - Does **not** log in, accept cookies on the user's behalf, solve CAPTCHAs, rotate proxies or change its identity. If Google blocks it, the run ends with exit code 3.
@@ -58,4 +58,4 @@ google-trends-output/
   reports/<slug>/<date>/report.md|html|xlsx, timeline_*.csv, regions.csv, related.csv, analysis.json
 ```
 
-All of it is user data about their business. It is git-ignored in this repository and should stay out of any commit.
+All of it is user data about their business. A folder created by the tool gets a `.gitignore` with `*`, so it stays out of the user's repositories; for an existing folder passed with `--out` the tool only warns. `report` and `diff` validate snapshot files strictly, so a snapshot received from someone else cannot write outside the output folder.

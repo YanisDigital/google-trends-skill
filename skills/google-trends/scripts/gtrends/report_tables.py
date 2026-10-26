@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .analyze import monthly
 from .texts import VERDICT_TEXT
+from .util import safe_join
 from .util import spreadsheet_safe as safe
 
 
@@ -49,7 +50,7 @@ def write_csvs(snap: dict, analysis: dict, folder: Path) -> list[Path]:
     for src in snap["sources"]:
         header, rows = timeline_rows(snap, src)
         if rows:
-            p = folder / f"timeline_{src}.csv"
+            p = safe_join(folder, f"timeline_{src}.csv")
             _write_csv(p, header, rows)
             written.append(p)
     rr = region_rows(snap)

@@ -26,23 +26,30 @@ from gtrends.analyze import analyze_snapshot  # noqa: E402
 from gtrends.fetch_playwright import BlockedError, fetch, validate_inputs  # noqa: E402
 from gtrends.ingest import ingest_raw  # noqa: E402
 from gtrends.parse import ParseError, add_csv, new_snapshot, series_labels, validate_snapshot  # noqa: E402
-from gtrends.util import safe_join  # noqa: E402
+from gtrends.util import MAX_INPUT_BYTES, prepare_output_dir, read_text_capped, safe_join  # noqa: E402
 
-MAX_INPUT_BYTES = 5_000_000
 FORMATS = ("md", "html", "xlsx", "csv")
 DEFAULT_OUT = "google-trends-output"
 
 
 def _read_text(path: str) -> str:
-    p = Path(path)
-    if p.stat().st_size > MAX_INPUT_BYTES:
-        raise ValueError(f"{p} is larger than {MAX_INPUT_BYTES // 1_000_000} MB; refusing to read it")
-    return p.read_text(encoding="utf-8-sig")
+    return read_text_capped(path, MAX_INPUT_BYTES)
+
+
+_warned: set[Path] = set()
+
+
+def _prepare(out: Path) -> None:
+    if not prepare_output_dir(out) and out not in _warned:
+        _warned.add(out)
+        print(f"warning: {out} already existed and has no .gitignore; make sure it is not committed to git",
+              file=sys.stderr)
 
 
 def finish(snap: dict, out: Path, formats: list[str], quiet: bool = False) -> int:
     """Save history, analyse, write reports, print the Markdown report."""
     validate_snapshot(snap)
+    _prepare(out)
     prev_path = history.previous_snapshot(out, snap)
     history.save_snapshot(out, snap)
     analysis = analyze_snapshot(snap)
@@ -84,6 +91,7 @@ def _formats(value: list[str]) -> list[str]:
 def cmd_check(a: argparse.Namespace) -> int:
     out = Path(a.out)
     validate_inputs(a.terms, a.geo, a.date, a.sources)
+    _prepare(out)
     raw = safe_join(out, "raw", history.slugify(" ".join(a.terms) + " ".join(a.geo) + a.date), date.today().isoformat())
     raw.mkdir(parents=True, exist_ok=True)
     fetch(a.terms, a.geo, a.date, a.sources, raw, category=a.category, headed=a.headed, delay_s=a.delay,
@@ -97,6 +105,7 @@ def cmd_ingest(a: argparse.Namespace) -> int:
     if bool(a.raw) == bool(a.compact):
         raise ValueError("give exactly one of --raw DIR or --compact FILE [FILE ...]")
     if a.compact:
+        _prepare(out)
         raw = safe_join(out, "raw", history.slugify(" ".join(a.terms) + " ".join(a.geo) + a.date), date.today().isoformat())
         for f in a.compact:
             compact.expand(json.loads(_read_text(f)), raw)
@@ -200,7 +209,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"BLOCKED: {exc}\nStop here. Export CSV files by hand from trends.google.com and use `import-csv`.",
               file=sys.stderr)
         return 3
-    except (ParseError, ValueError, FileNotFoundError, json.JSONDecodeError) as exc:
+    except (ParseError, ValueError, OSError, json.JSONDecodeError, RecursionError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     except RuntimeError as exc:

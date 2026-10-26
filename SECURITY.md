@@ -14,9 +14,9 @@ Out of scope: Google's own services, behaviour of third-party packages (report t
 
 ## Design guarantees
 
-- Network access only to `trends.google.com`; no telemetry; no credentials of any kind are read, stored or sent.
+- Network access only to `trends.google.com`; no telemetry. The scripts never read, store or send credentials or cookies. In browser mode the user's own Chrome sends its usual Google session to Google, as when browsing by hand; the documentation says so.
 - Data from Trends is treated as untrusted: escaped in HTML and Markdown, neutralised in spreadsheets, never executed.
-- Generated files stay in the user's chosen output folder, which is git-ignored by default.
+- Generated files stay in the user's chosen output folder; a folder the tool creates gets a `.gitignore` with `*`. Snapshot files are validated strictly, and every write is checked against the output folder.
 - If you believe a release violates any of the above, please report it.
 
 ## Supported versions

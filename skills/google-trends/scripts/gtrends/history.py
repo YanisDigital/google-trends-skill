@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .analyze import analyze_snapshot
 from .parse import validate_snapshot
-from .util import safe_join, slugify
+from .util import md_escape, read_text_capped, safe_join, slugify
 
 
 def slug_for(snap: dict) -> str:
@@ -19,15 +19,16 @@ def history_dir(out: Path, snap: dict) -> Path:
 
 
 def save_snapshot(out: Path, snap: dict) -> Path:
+    validate_snapshot(snap)  # 'created' becomes a file name
     folder = history_dir(out, snap)
     folder.mkdir(parents=True, exist_ok=True)
-    path = folder / f"{snap['created']}.json"
+    path = safe_join(folder, f"{snap['created']}.json")
     path.write_text(json.dumps(snap, ensure_ascii=False, indent=1), encoding="utf-8")
     return path
 
 
 def load_snapshot(path: Path) -> dict:
-    snap = json.loads(Path(path).read_text(encoding="utf-8"))
+    snap = json.loads(read_text_capped(path))
     validate_snapshot(snap)
     return snap
 
@@ -73,6 +74,7 @@ def diff(old: dict, new: dict) -> dict:
 def render_diff(d: dict) -> str:
     lines = [f"## Changes since {d['from']} (now {d['to']})", ""]
     for lab, e in d["terms"].items():
+        lab = md_escape(lab)
         if e.get("new_term"):
             lines.append(f"- {lab}: new term, nothing to compare")
             continue
@@ -87,8 +89,9 @@ def render_diff(d: dict) -> str:
         if "verdict" in e:
             bits.append(f"verdict {e['verdict'][0]} -> {e['verdict'][1]}")
         if "new_rising_queries" in e:
-            bits.append("new rising: " + ", ".join(e["new_rising_queries"][:5]))
+            bits.append("new rising: " + ", ".join(md_escape(q) for q in e["new_rising_queries"][:5]))
         if "top_regions" in e:
-            bits.append("top regions: " + ", ".join(e["top_regions"][0]) + " -> " + ", ".join(e["top_regions"][1]))
+            bits.append("top regions: " + ", ".join(md_escape(r) for r in e["top_regions"][0]) + " -> "
+                        + ", ".join(md_escape(r) for r in e["top_regions"][1]))
         lines.append(f"- {lab}: " + "; ".join(bits))
     return "\n".join(lines) + "\n"

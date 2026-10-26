@@ -9,19 +9,25 @@ told to fall back to manual CSV export. There is no bypass logic.
 from __future__ import annotations
 
 import json
-import re
 import time
 import urllib.parse
 from pathlib import Path
 from urllib.parse import urlparse
 
-from .parse import SOURCE_GPROP, ParseError, load_widget_json
+from .parse import DATE_RANGE_RE, GEO_RE, MAX_TERMS, SOURCE_GPROP, ParseError, load_widget_json
 
 BASE = "https://trends.google.com/trends/explore"
 ALLOWED_HOST_SUFFIXES = (".google.com", ".gstatic.com", ".googleapis.com")
-MAX_TERMS = 5
-_DATE_OK = re.compile(r"^[A-Za-z0-9 \-]{1,30}$")
-_GEO_OK = re.compile(r"^([A-Z]{2}(-[A-Z0-9]{1,3})?)?$")
+
+
+# Service workers are blocked because their requests bypass context.route(), which enforces the
+# Google-only host list. Downloads are refused: the collector never needs a file from the page.
+CONTEXT_OPTIONS = {
+    "locale": "en-US",
+    "viewport": {"width": 1280, "height": 2200},
+    "service_workers": "block",
+    "accept_downloads": False,
+}
 
 
 class BlockedError(RuntimeError):
@@ -34,11 +40,11 @@ def validate_inputs(terms: list[str], geos: list[str], date_range: str, sources:
     for t in terms:
         if not t.strip() or len(t) > 100 or "," in t or any(ord(c) < 32 for c in t):
             raise ValueError(f"invalid term {t!r}: 1-100 characters, no commas or control characters")
-    if not geos or len(geos) > MAX_TERMS or any(not _GEO_OK.match(g) for g in geos):
+    if not geos or len(geos) > MAX_TERMS or any(not GEO_RE.match(g) for g in geos):
         raise ValueError("geo must look like UA, US or US-CA (empty = worldwide)")
     if len(geos) > 1 and len(terms) != 1:
         raise ValueError("compare either several terms in one geo or one term in several geos")
-    if not _DATE_OK.match(date_range):
+    if not DATE_RANGE_RE.match(date_range):
         raise ValueError(f"unsupported date range {date_range!r} (e.g. 'today 5-y', 'today 12-m')")
     bad = [s for s in sources if s not in SOURCE_GPROP]
     if bad:
@@ -155,7 +161,7 @@ def fetch(terms: list[str], geos: list[str], date_range: str, sources: list[str]
                     time.sleep(delay_s)
                 url = explore_url(terms, geos, date_range, source, category)
                 for attempt in (1, 2):
-                    context = browser.new_context(locale="en-US", viewport={"width": 1280, "height": 2200})
+                    context = browser.new_context(**CONTEXT_OPTIONS)
                     context.route("**/*", _route_filter)
                     page = context.new_page()
                     ctx = _collect(page, terms, settle_s=4.0, timeout_s=60.0)

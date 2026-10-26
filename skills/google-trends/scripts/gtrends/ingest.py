@@ -19,10 +19,11 @@ from .parse import (
     series_labels,
     validate_snapshot,
 )
+from .util import read_text_capped
 
 
 def _read(path: Path) -> dict:
-    return load_widget_json(path.read_text(encoding="utf-8"))
+    return load_widget_json(read_text_capped(path))
 
 
 def ingest_raw(raw_dir: Path, terms: list[str], geos: list[str], date_range: str,

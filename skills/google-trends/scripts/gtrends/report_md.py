@@ -12,15 +12,7 @@ from .texts import (
     marketplaces_for,
     month_name,
 )
-from .util import clean_text
-
-
-def _md(text: object) -> str:
-    """Escape characters that would change Markdown structure."""
-    s = clean_text(text)
-    for ch in ("\\", "`", "*", "_", "[", "]", "|", "<", ">"):
-        s = s.replace(ch, "\\" + ch)
-    return s.replace("\n", " ")
+from .util import md_escape as _md
 
 
 def render(snap: dict, analysis: dict) -> str:

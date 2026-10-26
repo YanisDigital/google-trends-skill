@@ -64,11 +64,12 @@ Results go to `./google-trends-output/` (git-ignored). Run the same query later 
 
 ## Privacy and security
 
-- **Network:** only `trends.google.com`. The browser collector blocks every other host. Your terms are sent to Google exactly as if you typed them into the site; nothing is sent to anyone else, and there is no telemetry.
-- **No credentials:** no login, no API keys, no cookies from your browser. Playwright runs in a fresh throwaway profile.
+- **Network:** only `trends.google.com`. The Playwright collector blocks every other host (service workers and downloads are disabled so nothing slips past the filter); the RSS client refuses redirects to any other host. Your terms are sent to Google exactly as if you typed them into the site; nothing is sent to anyone else, and there is no telemetry.
+- **No credentials in the scripts:** no login, no API keys. The CLI's Playwright browser runs in a fresh throwaway profile without your cookies.
+- **Browser mode uses your own Chrome session.** With Claude in Chrome the page is opened in your real browser, so if you are signed in to Google, these Trends searches are linked to your Google account exactly as when you search by hand. Use a Chrome profile that is not signed in to Google if you want to avoid that. The skill never reads or stores your cookies.
 - **No evasion:** no proxies, no CAPTCHA solving, no identity tricks. A 429, consent wall or CAPTCHA ends the run.
-- **Local data:** reports, raw responses and history stay in your working folder and are ignored by git. They describe your business ideas; do not commit them.
-- **Untrusted text:** query texts from Trends are treated as data. HTML reports are escaped and ship with a strict Content-Security-Policy and no scripts; CSV and XLSX cells that start with `=`, `+`, `-` or `@` are neutralised; the RSS parser rejects DOCTYPE/entity declarations; output paths cannot escape the output folder.
+- **Local data:** reports, raw responses and history stay in `./google-trends-output/`. When the tool creates that folder it puts a `.gitignore` with `*` inside, so the reports stay out of your own repositories too; if you point `--out` at an existing folder it warns instead of touching it. The files describe your business ideas; do not commit or share them.
+- **Untrusted text:** query texts from Trends are treated as data. HTML reports are escaped and ship with a strict Content-Security-Policy and no scripts; CSV and XLSX cells that start with `=`, `+`, `-` or `@` are neutralised; Markdown output escapes links, images and HTML; the RSS parser rejects DOCTYPE/entity declarations; snapshots are validated strictly before use, and every output path is checked so it cannot escape the output folder, even for a snapshot someone else sent you.
 - **Supply chain:** two pinned runtime dependencies, GitHub Actions pinned by commit SHA, Dependabot, secret scanning (gitleaks) on every push.
 
 See [SECURITY.md](SECURITY.md) to report a vulnerability.

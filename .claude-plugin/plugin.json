@@ -1,7 +1,7 @@
 {
   "name": "google-trends",
   "description": "Google Trends for ecommerce: validate products, find seasonality and ad start dates, pick regions, compare names, spot rising queries.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": { "name": "YanisDigital" },
   "homepage": "https://github.com/YanisDigital/google-trends-skill",
   "repository": "https://github.com/YanisDigital/google-trends-skill",

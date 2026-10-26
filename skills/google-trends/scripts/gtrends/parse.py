@@ -22,6 +22,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import math
 import re
 from datetime import date, datetime, timezone
 
@@ -31,6 +32,11 @@ SCHEMA = 1
 XSSI_PREFIX = ")]}'"
 SOURCE_GPROP = {"web": "", "shopping": "froogle", "youtube": "youtube", "images": "images", "news": "news"}
 _DATE_RE = re.compile(r"^\d{4}-\d{2}(-\d{2})?")
+ISO_DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+GEO_RE = re.compile(r"^([A-Z]{2}(-[A-Z0-9]{1,3})?)?$")
+DATE_RANGE_RE = re.compile(r"^[A-Za-z0-9 \-]{1,30}$")
+ORIGINS = ("playwright", "browser", "csv")
+MAX_TERMS = 5
 _LABEL_SUFFIX = re.compile(r"^(.*?):\s*\(.*\)\s*$")
 
 
@@ -79,8 +85,11 @@ def parse_multiline(obj: dict) -> dict:
     for row in rows:
         if row.get("isPartial"):
             continue
-        day = datetime.fromtimestamp(int(row["time"]), timezone.utc).date().isoformat()
-        vals = [int(v) for v in row.get("value", [])]
+        try:
+            day = datetime.fromtimestamp(int(row["time"]), timezone.utc).date().isoformat()
+            vals = [int(v) for v in row.get("value", [])]
+        except (KeyError, TypeError, ValueError, OverflowError, OSError) as exc:
+            raise ParseError(f"malformed timelineData row: {exc}") from exc
         if not columns:
             columns = [[] for _ in vals]
         if len(vals) != len(columns):
@@ -104,11 +113,18 @@ def parse_geo(obj: dict) -> list[list[dict]]:
             out[i].append({
                 "code": clean_text(row.get("geoCode", ""), 20),
                 "name": clean_text(row.get("geoName", ""), 80),
-                "value": int(v),
+                "value": _int_or_error(v),
             })
     for lst in out:
         lst.sort(key=lambda r: (-r["value"], r["name"]))
     return out
+
+
+def _int_or_error(v: object) -> int:
+    try:
+        return int(v)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ParseError(f"not an integer: {v!r}") from exc
 
 
 def _related_item(item: dict) -> dict:
@@ -164,9 +180,12 @@ def _num(cell: str) -> int:
     if cell.startswith("<") or cell in ("", "-"):
         return 0
     try:
-        return int(float(cell))
+        number = float(cell)
     except ValueError as exc:
         raise ParseError(f"not a number: {cell!r}") from exc
+    if not math.isfinite(number):
+        raise ParseError(f"not a finite number: {cell!r}")
+    return int(number)
 
 
 def parse_timeline_csv(text: str) -> dict:
@@ -278,16 +297,97 @@ def add_csv(snapshot: dict, source: str, *, timeline: str | None = None, regions
         node["related"] = {lab: parse_related_csv(txt) for lab, txt in related.items()}
 
 
+def _fail(msg: str) -> None:
+    raise ParseError(f"invalid snapshot: {msg}")
+
+
+def _is_int(v: object) -> bool:
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def _check_day(value: object, what: str) -> None:
+    if not isinstance(value, str) or not ISO_DAY_RE.match(value):
+        _fail(f"{what} must be a YYYY-MM-DD string")
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        _fail(f"{what} is not a real date: {value!r}")
+
+
+def _check_label(value: object, what: str) -> None:
+    if not isinstance(value, str) or not value.strip() or len(value) > 200:
+        _fail(f"{what} must be a non-empty string of at most 200 characters")
+
+
 def validate_snapshot(snap: dict) -> None:
+    """Strict structural check. Snapshots may come from other people, and their fields end up in
+    file names, Markdown, HTML and spreadsheets, so anything unexpected is rejected."""
     if not isinstance(snap, dict) or snap.get("schema") != SCHEMA:
         raise ParseError(f"unsupported snapshot (expected schema {SCHEMA})")
-    if not isinstance(snap.get("sources"), dict) or "web" not in snap["sources"]:
+    _check_day(snap.get("created"), "'created'")
+    if snap.get("origin") not in ORIGINS:
+        _fail(f"'origin' must be one of {ORIGINS}")
+    q = snap.get("query")
+    if not isinstance(q, dict):
+        _fail("'query' must be an object")
+    terms, geos = q.get("terms"), q.get("geos")
+    if not isinstance(terms, list) or not 1 <= len(terms) <= MAX_TERMS:
+        _fail(f"'query.terms' must hold 1-{MAX_TERMS} terms")
+    for t in terms:
+        _check_label(t, "a term")
+    if not isinstance(geos, list) or len(geos) > MAX_TERMS or not all(isinstance(g, str) and GEO_RE.match(g) for g in geos):
+        _fail("'query.geos' must be country/region codes such as UA or US-CA")
+    if not isinstance(q.get("date"), str) or not DATE_RANGE_RE.match(q["date"]):
+        _fail("'query.date' must look like 'today 5-y'")
+    if not _is_int(q.get("category", 0)):
+        _fail("'query.category' must be an integer")
+
+    sources = snap.get("sources")
+    if not isinstance(sources, dict) or "web" not in sources:
         raise ParseError("snapshot has no 'web' source")
-    for name, src in snap["sources"].items():
+    for name, src in sources.items():
+        if name not in SOURCE_GPROP:
+            _fail(f"unknown source {name!r}")
+        if not isinstance(src, dict) or set(src) - {"timeline", "regions", "related"}:
+            _fail(f"source {name!r} may only hold timeline, regions and related")
         tl = src.get("timeline")
-        if tl is None:
-            continue
-        n = len(tl.get("dates", []))
-        for lab, vals in tl.get("series", {}).items():
-            if len(vals) != n:
-                raise ParseError(f"{name}/{lab}: series length differs from dates")
+        if tl is not None:
+            if not isinstance(tl, dict) or not isinstance(tl.get("dates"), list) or not isinstance(tl.get("series"), dict):
+                _fail(f"{name}: timeline needs 'dates' and 'series'")
+            for d in tl["dates"]:
+                _check_day(d, f"{name}: a timeline date")
+            if not 1 <= len(tl["series"]) <= MAX_TERMS:
+                _fail(f"{name}: timeline must hold 1-{MAX_TERMS} series")
+            n = len(tl["dates"])
+            for lab, vals in tl["series"].items():
+                _check_label(lab, f"{name}: a series label")
+                if not isinstance(vals, list) or len(vals) != n:
+                    raise ParseError(f"{name}/{lab}: series length differs from dates")
+                if not all(_is_int(v) and 0 <= v <= 100 for v in vals):
+                    _fail(f"{name}/{lab}: series values must be integers 0-100")
+        regions = src.get("regions") or {}
+        if not isinstance(regions, dict):
+            _fail(f"{name}: regions must be an object")
+        for lab, regs in regions.items():
+            _check_label(lab, f"{name}: a region label")
+            if not isinstance(regs, list):
+                _fail(f"{name}/{lab}: regions must be a list")
+            for r in regs:
+                if not (isinstance(r, dict) and isinstance(r.get("code"), str) and isinstance(r.get("name"), str)
+                        and _is_int(r.get("value"))):
+                    _fail(f"{name}/{lab}: each region needs code, name and an integer value")
+        related = src.get("related") or {}
+        if not isinstance(related, dict):
+            _fail(f"{name}: related must be an object")
+        for lab, rel in related.items():
+            _check_label(lab, f"{name}: a related label")
+            if not isinstance(rel, dict):
+                _fail(f"{name}/{lab}: related must be an object")
+            for kind in ("top", "rising"):
+                items = rel.get(kind, [])
+                if not isinstance(items, list):
+                    _fail(f"{name}/{lab}: related.{kind} must be a list")
+                for r in items:
+                    if not (isinstance(r, dict) and isinstance(r.get("query"), str)
+                            and (r.get("value") is None or _is_int(r.get("value"))) and isinstance(r.get("breakout"), bool)):
+                        _fail(f"{name}/{lab}: each related query needs query, value (integer or null) and breakout")
