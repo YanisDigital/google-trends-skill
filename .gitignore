@@ -1,0 +1,28 @@
+# Generated reports, raw Google responses and history: user data, never commit
+google-trends-output/
+*.xlsx
+*.csv
+!tests/fixtures/*.csv
+
+# Secrets and local config
+.env
+.env.*
+*.pem
+*.key
+.claude/settings.local.json
+
+# Python / tooling
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.playwright/
+*.egg-info/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

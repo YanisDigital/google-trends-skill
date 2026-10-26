@@ -1,0 +1,2 @@
+)]}'
+{"default": {"rankedList": [{"rankedKeyword": [{"query": "acme widget", "value": 100, "formattedValue": "100", "hasData": true}, {"query": "widget review", "value": 60, "formattedValue": "60", "hasData": true}]}, {"rankedKeyword": [{"query": "acme widget vs gadget", "value": 5000, "formattedValue": "Breakout", "hasData": true}, {"query": "how to choose widget", "value": 250, "formattedValue": "+250%", "hasData": true}, {"query": "=HYPERLINK(\"http://evil.example\",\"x\")", "value": 120, "formattedValue": "+120%", "hasData": true}]}]}}

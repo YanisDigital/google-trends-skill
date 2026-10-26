@@ -1,0 +1,12 @@
+{
+  "name": "google-trends-skill",
+  "owner": { "name": "YanisDigital" },
+  "plugins": [
+    {
+      "name": "google-trends",
+      "source": "./",
+      "description": "Google Trends for ecommerce: product validation, seasonality, regions, name comparison, rising queries.",
+      "version": "0.1.0"
+    }
+  ]
+}
