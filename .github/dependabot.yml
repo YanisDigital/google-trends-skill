@@ -1,9 +1,7 @@
 version: 2
 updates:
-  - package-ecosystem: "pip"
-    directory: "/skills/google-trends/scripts"
-    schedule:
-      interval: "weekly"
+  # The root requirements-dev.txt includes skills/google-trends/scripts/requirements.txt via "-r",
+  # so this single entry covers runtime and dev dependencies.
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
