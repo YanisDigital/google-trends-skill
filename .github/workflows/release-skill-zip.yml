@@ -1,0 +1,37 @@
+name: Attach skill zip to release
+
+# Every published release gets google-trends.zip: the skill alone, ready for the Claude app's
+# skill upload. Run it by hand with a tag to add the zip to an older release.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag, e.g. v0.1.2"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  skill-zip:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # upload the release asset
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Build the skill archive from the tag
+        run: python tools/build_skill_zip.py --ref "refs/tags/$TAG" dist/google-trends.zip
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" dist/google-trends.zip --clobber --repo "$GITHUB_REPOSITORY"

@@ -26,3 +26,6 @@ venv/
 Thumbs.db
 .idea/
 .vscode/
+
+# Built skill archives (upload to the Claude app or attach to a release)
+dist/

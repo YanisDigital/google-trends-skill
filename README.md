@@ -1,6 +1,6 @@
 # google-trends-skill
 
-A [Claude Code](https://claude.com/claude-code) skill that turns Google Trends into ecommerce decisions: is a product worth launching, when is its season, where to send the ad budget, which name to use, what is rising, and whether people want to buy or only read.
+A Claude skill for the Claude app and [Claude Code](https://claude.com/claude-code) that turns Google Trends into ecommerce decisions: is a product worth launching, when is its season, where to send the ad budget, which name to use, what is rising, and whether people want to buy or only read.
 
 It collects the curves, classifies them with fixed, auditable rules (no model guesswork in the numbers), and writes a verdict with the caveats attached: Markdown in chat plus HTML, CSV and XLSX files, and a history so you can re-check in a month.
 
@@ -26,14 +26,20 @@ The workflow follows a 15-minute product check with a pre-launch checklist; the 
 
 ## Install
 
-As a plugin (Claude Code):
+The skill itself lives in [`skills/google-trends/`](skills/google-trends/). Pick the way that fits where you use Claude.
+
+**Claude app (claude.ai, desktop):** download **`google-trends.zip`** from the [latest release](https://github.com/YanisDigital/google-trends-skill/releases/latest) (under *Assets*) and upload it as a skill in the app's skill settings. Use that file, not *Source code (zip)*: GitHub builds the source archive from the whole repository, and the app rejects it because it holds the plugin wrapper and tests around the skill. In the app the skill runs in a sandbox, so use CSV import or browser mode there; the Playwright collector needs a local machine.
+
+**Claude Code, as a plugin** (updates through `/plugin`):
 
 ```text
 /plugin marketplace add YanisDigital/google-trends-skill
 /plugin install google-trends@google-trends-skill
 ```
 
-Or copy `skills/google-trends/` into `~/.claude/skills/`.
+**Claude Code, as a plain skill:** unzip `google-trends.zip` into `~/.claude/skills/`, or copy `skills/google-trends/` there.
+
+Build the archive yourself with `python tools/build_skill_zip.py dist/google-trends.zip`.
 
 Optional, for the command line collector and XLSX output (Python 3.10+):
 
