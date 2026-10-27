@@ -27,6 +27,48 @@ The numbers, shapes, rankings and verdicts always come from the scripts, not fro
 
 The workflow follows a 15-minute product check with a pre-launch checklist; the manual items (search volume, competition) stay unticked on purpose.
 
+## How to use it in your business
+
+You do not need to know anything about Google Trends. Describe the decision you are facing in plain words; the skill collects the data, applies fixed rules and gives you a short answer, a checklist and report files you can keep or share. Every case below starts with a sentence you can type as is.
+
+| Your question | What to ask | What you get |
+|---|---|---|
+| **Is this product worth launching?** | "Check demand for 'neck massager' and 'massage pillow' in Poland." | Whether interest is growing, flat, a short fad or seasonal; whether Google Shopping shows real buying interest; the strongest regions; a go / test small / wait / avoid reading with the reasons. |
+| **When should I buy stock and start ads?** | "When is the season for space heaters in Ukraine, and when should I start advertising?" | The peak month, the estimated date of the next peak and an ad-start window 3-6 weeks before it. It also warns when the season starts earlier than last year. |
+| **Where should the ad budget go?** | "Which regions search most for 'power station' in Ukraine?" | The top regions for the first split of your campaigns, or a warning that the market is too small to split by region. |
+| **What should I call my product?** | "Compare 'air fryer', 'airfryer' and 'multicooker' in Germany." | Which name people actually search for most, which one is still growing, and a warning when one name drowns out the others. |
+| **Is another country worth testing?** | "Compare demand for 'standing desk' in Poland, Germany and the Czech Republic." | One chart for up to five countries, so the levels are comparable. A first look before you spend on a market study. |
+| **What is about to take off?** | "Show rising searches around 'pet grooming' and today's trending searches in Ukraine." | Fast-rising and "breakout" searches to test before competitors crowd in. Treat them as ideas to check, not as winners. |
+| **What should I write or film?** | "Find content ideas around 'standing desk' for Germany, including YouTube." | Rising questions tagged by intent: choose, compare, review, buy. A ready list of article and video topics people are starting to look for. |
+| **Is my brand gaining on the competition?** | "Compare my brand with competitors A and B over the last 12 months." | Your interest next to up to four others, and, when you run it again, what changed since the last time. |
+| **Is there demand for my service or niche?** | "Check demand for 'yoga classes' and 'yoga studio' in Ukraine, as a service." | The same curve, season, regions and related searches, plus a split of what people look for: learning about it, a job or course, or buying. No launch verdict, because it is not a product. |
+
+### A 15-minute routine before any launch
+
+1. Ask for the check with two to four names for the product, including other languages and slang your customers use.
+2. Read the verdict and the reasons, then look at the regions and the rising searches.
+3. Work through the checklist. The skill ticks what the data covers and leaves the rest open on purpose.
+4. Confirm the open items elsewhere: search volume in Google Keyword Planner, competitor ads in the Meta Ad Library, and prices on the marketplaces where you sell.
+5. Run the same check again in a month. The report ends with what changed, so you see whether interest is still growing and whether the season starts earlier.
+
+### Make it a habit
+
+- **Monthly:** run your main product, brand and competitor checks again and read only the "Changes since" block.
+- **Before each season:** check the season date for each category in your shop and plan stock and ads from it.
+- **Before every new product, name or market:** the 15-minute routine above.
+
+### If you prepare research for clients
+
+Agencies and freelancers can hand over the HTML and spreadsheet reports as an input for audits, pitches and launch plans. The reports state what Trends cannot show, so the client is not promised volumes or sales. Keep each client's data in a separate output folder, and do not publish it: the reports describe their business ideas.
+
+### What it will not tell you
+
+- **How many people search, or how much you will sell.** Trends shows relative interest from 0 to 100, never volumes. Use Keyword Planner for volumes.
+- **Whether you will make money.** Rising interest does not show margin or competition. Check ads, prices and your own costs.
+- **Anything about small topics and small towns.** Narrow searches often return "not enough data". The skill says so instead of guessing; try broader wording.
+- **Demand that does not start with a search.** Impulse products bought from short videos need the Meta Ad Library and TikTok Creative Center instead.
+- **Anything outside Google search.** Instagram, Telegram, marketplaces and word of mouth are not visible in Trends.
+
 ## Install
 
 The skill itself lives in [`skills/google-trends/`](skills/google-trends/). Pick the way that fits where you use Claude.
