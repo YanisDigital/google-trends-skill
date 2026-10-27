@@ -20,7 +20,7 @@ python -m playwright install chromium
 | `trending --geo UA` | "Trending now" from the public RSS feed |
 | `diff OLD.json NEW.json` | compare two snapshots |
 
-Common flags: `--out DIR` (default `./google-trends-output`), `--formats md html csv xlsx`. `check` also takes `--headed` (show the browser), `--delay` (seconds between pages, minimum 5), `--category`.
+Common flags: `--out DIR` (default `./google-trends-output`), `--formats md html csv xlsx`, `--kind product|service` (service: YouTube instead of Shopping, no launch verdict), `--all-regions` (keep Crimea and Sevastopol in the region ranking). `check` also takes `--headed` (show the browser), `--delay` (seconds between pages, minimum 5), `--category`.
 
 Exit codes: `0` ok, `2` invalid input or unreadable file, `3` blocked by Google (stop and use CSV), `4` missing optional dependency.
 
@@ -53,7 +53,8 @@ Series names are read from the CSV header. In `--related "LABEL=file"`, LABEL mu
 
 ```
 google-trends-output/
-  raw/<slug>/<date>/<source>/*.json       raw widget responses (check)
+  raw/<slug>/<date>/<source>/*.json       raw widget responses (check, ingest)
+  raw/<slug>/<date>/<source>.compact.json the compact input as received (ingest --compact)
   history/<slug>/<date>.json              snapshots, used by "Changes since"
   reports/<slug>/<date>/report.md|html|xlsx, timeline_*.csv, regions.csv, related.csv, analysis.json
 ```

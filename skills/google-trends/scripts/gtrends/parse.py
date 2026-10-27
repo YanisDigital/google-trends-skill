@@ -5,7 +5,7 @@ Produces a *snapshot*: a plain dict that every other module consumes.
 snapshot = {
     "schema": 1,
     "created": "YYYY-MM-DD",
-    "query": {"terms": [...], "geos": [...], "date": "today 5-y", "category": 0},
+    "query": {"terms": [...], "geos": [...], "date": "today 5-y", "category": 0, "kind": "product" | "service"},
     "origin": "playwright" | "browser" | "csv",
     "sources": {
         "web": {
@@ -36,6 +36,7 @@ ISO_DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 GEO_RE = re.compile(r"^([A-Z]{2}(-[A-Z0-9]{1,3})?)?$")
 DATE_RANGE_RE = re.compile(r"^[A-Za-z0-9 \-]{1,30}$")
 ORIGINS = ("playwright", "browser", "csv")
+KINDS = ("product", "service")
 MAX_TERMS = 5
 _LABEL_SUFFIX = re.compile(r"^(.*?):\s*\(.*\)\s*$")
 
@@ -257,11 +258,14 @@ def parse_related_csv(text: str) -> dict:
 
 # ------------------------------------------------------------------- snapshots
 
-def new_snapshot(terms: list[str], geos: list[str], date_range: str, origin: str, category: int = 0) -> dict:
+def new_snapshot(terms: list[str], geos: list[str], date_range: str, origin: str, category: int = 0,
+                 kind: str = "product") -> dict:
+    if kind not in KINDS:
+        raise ValueError(f"kind must be one of {KINDS}")
     return {
         "schema": SCHEMA,
         "created": date.today().isoformat(),
-        "query": {"terms": list(terms), "geos": list(geos), "date": date_range, "category": category},
+        "query": {"terms": list(terms), "geos": list(geos), "date": date_range, "category": category, "kind": kind},
         "origin": origin,
         "sources": {},
     }
@@ -341,6 +345,8 @@ def validate_snapshot(snap: dict) -> None:
         _fail("'query.date' must look like 'today 5-y'")
     if not _is_int(q.get("category", 0)):
         _fail("'query.category' must be an integer")
+    if q.get("kind", "product") not in KINDS:
+        _fail(f"'query.kind' must be one of {KINDS}")
 
     sources = snap.get("sources")
     if not isinstance(sources, dict) or "web" not in sources:

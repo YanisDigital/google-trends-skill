@@ -1,4 +1,4 @@
-# The 8 tasks
+# The 9 tasks
 
 For each task: the question, where the answer is, the command, the decision rule, what to put in the report. Examples use Ukraine (`UA`) as one possible market; change `--geo` for any other country.
 
@@ -21,7 +21,7 @@ Tasks 1-3 matter most for ecommerce: they drive purchasing, stock and ad budget.
 ## 3. Geo-targeting
 - **Question:** where to send the ad budget, where to open pickup points?
 - **Look at:** interest by region (`regions` in the report).
-- **Rule:** write down the top 3-5 regions. If fewer than 3 regions have data, the market is too small for a geo split - say so. Region values are relative within the query, not volumes: a small region can show 100.
+- **Rule:** write down the top 3-5 regions from the report. Crimea and Sevastopol are left out by default (tiny samples that jump to the top) and the remaining values are rescaled so the top region is 100; `--all-regions` shows everything. If fewer than 3 regions have data, the market is too small for a geo split - say so. Region values are relative within the query, not volumes: a small region can show 100.
 - **Report:** top regions as a budget-split suggestion for Meta/TikTok, to be checked with real campaign data.
 
 ## 4. Compare options
@@ -51,6 +51,14 @@ Tasks 1-3 matter most for ecommerce: they drive purchasing, stock and ad budget.
 - **Question:** is our brand marketing working?
 - **Command:** `check --terms "our brand" "competitor a" "competitor b" --date "today 12-m"`, repeated after a sale or an ad wave.
 - **Rule:** compare shares of the leader between runs; the "Changes since" block shows movement. Brand names are small queries: expect "not enough data" for small shops.
+
+## 9. Demand for a service, profession or niche
+- **Question:** what does Google search interest say about "targetologist", "plumber", "yoga classes"? Not a product, so nothing to launch or stock.
+- **Command:** `check --kind service --terms "targetolog" "targetovana reklama" --geo UA` (sources default to web and YouTube; no Shopping). With a browser or CSV, pass `--kind service` to `ingest` / `import-csv` too.
+- **Look at:** the shape, the season, the regions, and the **intent mix** of related queries: the share of the top-query weight that is definitions ("what is", "це", "это"), career and learning (jobs, courses, salary) or buying words (price, order, hire). It is printed as numbers.
+- **Rule:** the reading is `RISING / STEADY / SEASONAL / FALLING / SPIKE / INCONCLUSIVE`. It says what Google search interest does, not whether to start a business. A mostly informational mix means the searches are about the topic, not about hiring; the report states the numbers and nothing more.
+- **Language and scale:** compare Ukrainian and Russian wordings. If one term swamps the rest, run the small ones on their own.
+- **What Trends cannot show:** Instagram, Telegram, marketplaces, exchanges and referrals. The report lists this; do not turn it into a channel recommendation, or label it "Hypothesis:" with its check.
 
 ## Extra modes
 

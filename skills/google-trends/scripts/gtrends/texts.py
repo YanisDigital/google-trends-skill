@@ -13,7 +13,21 @@ SHAPE_TEXT = {
     "insufficient_data": "Not enough data: the query is too small or the window too short",
 }
 
+SHAPE_TEXT_SERVICE = {
+    "growing": "Growing: search interest has been rising over the window",
+    "stable": "Stable: search interest is flat",
+    "fad": "Spike: one sharp peak followed by a collapse",
+    "seasonal": "Seasonal: peaks recur every year",
+    "declining": "Declining: search interest is falling",
+    "insufficient_data": "Not enough data: the query is too small or the window too short",
+}
+
 VERDICT_TEXT = {
+    "demand_growing": "RISING: Google search interest is growing",
+    "demand_stable": "STEADY: Google search interest is flat",
+    "demand_seasonal": "SEASONAL: Google search interest recurs every year",
+    "demand_falling": "FALLING: Google search interest is declining",
+    "demand_spiky": "SPIKE: one peak, then a collapse",
     "go_validate": "GO: worth validating further",
     "test_small": "TEST: only with a small budget",
     "wait": "WAIT: prepare for the next season",
@@ -26,7 +40,15 @@ INTENT_TEXT = {
     "weak": "weak in Google Shopping",
     "unclear": "unclear (partial overlap)",
     "not_checked": "Shopping not collected",
+    "not_applicable": "not applicable (service mode)",
 }
+
+# What a Trends reading of a service or profession cannot show. Facts about the tool, not advice.
+SERVICE_LIMITS = [
+    "Trends covers Google search only. Instagram, Telegram, marketplaces, freelance exchanges and word of mouth are not visible in it.",
+    "A low or falling index means fewer Google searches for these words, not fewer customers.",
+    "Related queries show what people search next to the term; they do not show who the searchers are.",
+]
 
 CHECK_MARK = {"done": "[x]", "todo": "[ ]", "attention": "[!]", "manual": "[ ]", "n/a": "[-]"}
 
@@ -51,6 +73,10 @@ PITFALLS = [
 ]
 
 
+def shape_text(shape: str, kind: str = "product") -> str:
+    return (SHAPE_TEXT_SERVICE if kind == "service" else SHAPE_TEXT)[shape]
+
+
 def month_name(m: int | None) -> str:
     return MONTHS[m - 1] if m else "n/a"
 
@@ -62,6 +88,8 @@ def geo_label(snap: dict) -> str:
 
 def marketplaces_for(snap: dict) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
+    if snap["query"].get("kind") == "service":
+        return out
     for g in snap["query"].get("geos") or []:
         out.extend(MARKETPLACES.get((g or "").upper(), []))
     return out

@@ -46,20 +46,20 @@ def _prepare(out: Path) -> None:
               file=sys.stderr)
 
 
-def finish(snap: dict, out: Path, formats: list[str], quiet: bool = False) -> int:
+def finish(snap: dict, out: Path, formats: list[str], quiet: bool = False, all_regions: bool = False) -> int:
     """Save history, analyse, write reports, print the Markdown report."""
     validate_snapshot(snap)
     _prepare(out)
     prev_path = history.previous_snapshot(out, snap)
-    history.save_snapshot(out, snap)
-    analysis = analyze_snapshot(snap)
+    snapshot_path = history.save_snapshot(out, snap)
+    analysis = analyze_snapshot(snap, include_unreliable=all_regions)
     folder = safe_join(out, "reports", history.slug_for(snap), snap["created"])
     folder.mkdir(parents=True, exist_ok=True)
     md = report_md.render(snap, analysis)
     if prev_path:
         md += "\n" + history.render_diff(history.diff(history.load_snapshot(prev_path), snap))
     (folder / "analysis.json").write_text(json.dumps(analysis, ensure_ascii=False, indent=1), encoding="utf-8")
-    written = [folder / "analysis.json"]
+    written = [snapshot_path, folder / "analysis.json"]
     if "md" in formats:
         (folder / "report.md").write_text(md, encoding="utf-8")
         written.append(folder / "report.md")
@@ -88,16 +88,23 @@ def _formats(value: list[str]) -> list[str]:
     return value
 
 
+def _sources(a: argparse.Namespace) -> list[str]:
+    """Products are checked in web search and Google Shopping, services in web search and YouTube."""
+    return a.sources or (["web", "youtube"] if a.kind == "service" else ["web", "shopping"])
+
+
 def cmd_check(a: argparse.Namespace) -> int:
     out = Path(a.out)
-    validate_inputs(a.terms, a.geo, a.date, a.sources)
+    sources = _sources(a)
+    validate_inputs(a.terms, a.geo, a.date, sources)
     _prepare(out)
     raw = safe_join(out, "raw", history.slugify(" ".join(a.terms) + " ".join(a.geo) + a.date), date.today().isoformat())
     raw.mkdir(parents=True, exist_ok=True)
-    fetch(a.terms, a.geo, a.date, a.sources, raw, category=a.category, headed=a.headed, delay_s=a.delay,
+    fetch(a.terms, a.geo, a.date, sources, raw, category=a.category, headed=a.headed, delay_s=a.delay,
           log=lambda m: print(m, file=sys.stderr))
-    snap = ingest_raw(raw, a.terms, a.geo, a.date, "playwright", a.category)
-    return finish(snap, out, _formats(a.formats))
+    snap = ingest_raw(raw, a.terms, a.geo, a.date, "playwright", a.category, a.kind)
+    print(f"Raw Google responses kept in: {raw}", file=sys.stderr)
+    return finish(snap, out, _formats(a.formats), all_regions=a.all_regions)
 
 
 def cmd_ingest(a: argparse.Namespace) -> int:
@@ -108,16 +115,20 @@ def cmd_ingest(a: argparse.Namespace) -> int:
         _prepare(out)
         raw = safe_join(out, "raw", history.slugify(" ".join(a.terms) + " ".join(a.geo) + a.date), date.today().isoformat())
         for f in a.compact:
-            compact.expand(json.loads(_read_text(f)), raw)
+            data = json.loads(_read_text(f))
+            source = compact.expand(data, raw)
+            # keep the input as received next to the expanded files, so the run can be reproduced
+            (raw / f"{source}.compact.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        print(f"Source data kept in: {raw}", file=sys.stderr)
     else:
         raw = Path(a.raw)
-    snap = ingest_raw(raw, a.terms, a.geo, a.date, "browser", a.category)
-    return finish(snap, out, _formats(a.formats))
+    snap = ingest_raw(raw, a.terms, a.geo, a.date, "browser", a.category, a.kind)
+    return finish(snap, out, _formats(a.formats), all_regions=a.all_regions)
 
 
 def cmd_import_csv(a: argparse.Namespace) -> int:
     web_tl = _read_text(a.web_timeline)
-    snap = new_snapshot([], a.geo, a.date, "csv")
+    snap = new_snapshot([], a.geo, a.date, "csv", kind=a.kind)
     add_csv(snap, "web", timeline=web_tl,
             regions=_read_text(a.regions) if a.regions else None,
             related={k: _read_text(v) for k, v in (kv.split("=", 1) for kv in a.related or [])} or None)
@@ -126,11 +137,11 @@ def cmd_import_csv(a: argparse.Namespace) -> int:
     if a.shopping_timeline:
         add_csv(snap, "shopping", timeline=_read_text(a.shopping_timeline))
     series_labels(snap["query"]["terms"], a.geo)  # validates the term/geo combination
-    return finish(snap, Path(a.out), _formats(a.formats))
+    return finish(snap, Path(a.out), _formats(a.formats), all_regions=a.all_regions)
 
 
 def cmd_report(a: argparse.Namespace) -> int:
-    return finish(history.load_snapshot(Path(a.snapshot)), Path(a.out), _formats(a.formats))
+    return finish(history.load_snapshot(Path(a.snapshot)), Path(a.out), _formats(a.formats), all_regions=a.all_regions)
 
 
 def cmd_trending(a: argparse.Namespace) -> int:
@@ -150,14 +161,20 @@ def build_parser() -> argparse.ArgumentParser:
     def common(sp: argparse.ArgumentParser, with_query: bool = True) -> None:
         sp.add_argument("--out", default=DEFAULT_OUT, help="output folder (default: ./google-trends-output)")
         sp.add_argument("--formats", nargs="+", default=["md", "html", "csv", "xlsx"], help="md html csv xlsx")
+        sp.add_argument("--all-regions", action="store_true",
+                        help="keep Crimea and Sevastopol in the region ranking (left out by default: tiny samples)")
         if with_query:
+            sp.add_argument("--kind", choices=["product", "service"], default="product",
+                            help="product (default): Google Shopping check, launch verdict; "
+                                 "service: professions and niches, YouTube instead of Shopping, no launch verdict")
             sp.add_argument("--geo", nargs="+", default=["UA"], help="country code(s); '' = worldwide")
             sp.add_argument("--date", default="today 5-y", help="Trends period, e.g. 'today 5-y'")
 
     c = sub.add_parser("check", help="fetch with Playwright and report")
     common(c)
     c.add_argument("--terms", nargs="+", required=True, help="1-5 terms, e.g. 'air fryer' 'multicooker'")
-    c.add_argument("--sources", nargs="+", default=["web", "shopping"], help="web shopping youtube images news")
+    c.add_argument("--sources", nargs="+", default=None,
+                   help="web shopping youtube images news (default: web shopping; for --kind service: web youtube)")
     c.add_argument("--category", type=int, default=0)
     c.add_argument("--headed", action="store_true", help="show the browser window")
     c.add_argument("--delay", type=float, default=8.0, help="seconds between pages (min 5)")

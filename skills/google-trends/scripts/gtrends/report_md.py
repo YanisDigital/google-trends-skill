@@ -6,11 +6,12 @@ from .texts import (
     INTENT_TEXT,
     NEXT_STEPS,
     PITFALLS,
-    SHAPE_TEXT,
+    SERVICE_LIMITS,
     VERDICT_TEXT,
     geo_label,
     marketplaces_for,
     month_name,
+    shape_text,
 )
 from .util import md_escape as _md
 
@@ -18,10 +19,12 @@ from .util import md_escape as _md
 def render(snap: dict, analysis: dict) -> str:
     q = snap["query"]
     terms = analysis["terms"]
+    kind = analysis.get("kind", "product")
     lines = [
         f"# Google Trends check: {_md(', '.join(q['terms']))}",
         "",
-        f"Geo: {_md(geo_label(snap))} | Period: {_md(q['date'])} | Collected: {snap['created']} | Data via: {snap['origin']}",
+        f"Geo: {_md(geo_label(snap))} | Period: {_md(q['date'])} | Collected: {snap['created']} | Data via: {snap['origin']}"
+        + (" | Mode: service" if kind == "service" else ""),
         "",
     ]
     primary = analysis.get("primary")
@@ -33,7 +36,12 @@ def render(snap: dict, analysis: dict) -> str:
 
     comp = analysis.get("comparison", {})
     if len(terms) > 1 and comp.get("ranking"):
-        lines += ["## Name comparison", "", "| Term | Shape | Level (last 12m) | Share of leader |", "|---|---|---|---|"]
+        lines += [
+            f"## {'Wording' if kind == 'service' else 'Name'} comparison",
+            "",
+            "| Term | Shape | Level (last 12m) | Share of leader |",
+            "|---|---|---|---|",
+        ]
         for r in comp["ranking"]:
             lines.append(f"| {_md(r['term'])} | {r['shape']} | {r['avg_last_12m']} | {int(r['share_of_leader'] * 100)}% |")
         lines.append("")
@@ -43,7 +51,7 @@ def render(snap: dict, analysis: dict) -> str:
 
     for lab, t in terms.items():
         web = t["web"]
-        lines += [f"## {_md(lab)}", "", f"**Shape:** {SHAPE_TEXT[web['shape']]}"]
+        lines += [f"## {_md(lab)}", "", f"**Shape:** {shape_text(web['shape'], kind)}"]
         if web.get("yoy_ratio") is not None:
             lines.append(f"**Year over year (last 12m vs previous 12m):** x{web['yoy_ratio']}")
         seas = web.get("seasonality")
@@ -52,7 +60,8 @@ def render(snap: dict, analysis: dict) -> str:
                          f"rise starts around {month_name(seas['rise_start_month'])}")
             tm = web.get("timing")
             if tm:
-                lines.append(f"**Next peak (estimate):** {tm['next_peak']}; start ads between "
+                what = "prepare between" if kind == "service" else "start ads between"
+                lines.append(f"**Next peak (estimate):** {tm['next_peak']}; {what} "
                              f"{tm['ads_start_from']} and {tm['ads_start_until']}")
             shift = seas.get("rise_shift_months")
             if shift:
@@ -60,8 +69,14 @@ def render(snap: dict, analysis: dict) -> str:
                 lines.append(f"**Watch:** the rise began {abs(shift)} month(s) {direction} than the previous season")
         elif seas is None:
             lines.append("**Season:** not testable (needs about 2.5+ years of data)")
-        if t["intent"]["status"] != "not_checked":
+        if t["intent"]["status"] not in ("not_checked", "not_applicable"):
             lines.append(f"**Buying intent:** {INTENT_TEXT[t['intent']['status']]}")
+        mix = t.get("intent_mix")
+        if mix and mix["total_weight"]:
+            s = mix["share"]
+            lines.append(f"**Related queries by intent (share of top-query weight):** definitions {s['define']}%, "
+                         f"career/learning {s['career']}%, buying words {s['buy']}%, choose {s['choose']}%, "
+                         f"compare {s['compare']}%, reviews {s['review']}%, no tag {mix['other']}%")
         reg = t.get("regions")
         if reg:
             top = ", ".join(f"{_md(r['name'])} ({r['value']})" for r in reg["top"])
@@ -85,7 +100,7 @@ def render(snap: dict, analysis: dict) -> str:
         lines.append("")
 
     if primary and primary in terms:
-        lines += ["## Pre-launch checklist", ""]
+        lines += [f"## {'Research' if kind == 'service' else 'Pre-launch'} checklist", ""]
         lines += [f"- {CHECK_MARK[c['status']]} {c['item']}" for c in terms[primary]["checklist"]]
         lines.append("")
 
@@ -94,6 +109,8 @@ def render(snap: dict, analysis: dict) -> str:
     mk = marketplaces_for(snap)
     if mk:
         lines.append("- Prices: " + ", ".join(f"[{n}]({u})" for n, u in mk))
+    if kind == "service":
+        lines += ["", "## What Trends cannot show here", ""] + [f"- {s}" for s in SERVICE_LIMITS]
     lines += ["", "## Caveats", ""]
     if primary and primary in terms:
         lines += [f"- {c}" for c in terms[primary]["verdict"]["caveats"]]

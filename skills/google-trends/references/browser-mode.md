@@ -10,13 +10,14 @@ Verified on 2026-10-26 with Claude in Chrome: explore page, widget data, one and
 
 1. **Open the page.** Build the URL from [url-parameters.md](url-parameters.md) (`q`, `date`, `geo`, `hl=en`, plus `gprop=froogle` for Shopping) and navigate. Title `Error 429`, a consent page or a CAPTCHA means stop: tell the user and switch to manual CSV. Do not click through consent or CAPTCHA for the user; for a cookie banner choose the most privacy-preserving option.
 2. **Wait about 4 seconds**, then run the snippet below in the page (JavaScript tool). Set `TERMS` to the terms in the same order as in `q`, and `SOURCE` to `web`, `shopping`, `youtube`, `images` or `news`. The snippet re-reads the three data responses the page itself already requested, from the same origin, and returns a small object.
-3. **Save the returned object verbatim** as `<name>.compact.json` in the user's output folder, one file per source. Do not retype or round numbers.
+3. **Save the returned object verbatim** as `google-trends-output/input/<source>.compact.json` in the user's working folder (the output folder gets its `.gitignore` on the first run), one file per source. Do not retype or round numbers, and do not compute anything from it yourself: the next step does that.
 4. **Repeat** for Shopping: navigate with `gprop=froogle`, run the snippet with `SOURCE = "shopping"`, save a second file.
 5. **Ingest:**
    ```bash
-   python "${CLAUDE_SKILL_DIR}/scripts/trends_cli.py" ingest --compact web.compact.json shopping.compact.json --terms "air fryer" "multicooker" --geo UA
+   python "${CLAUDE_SKILL_DIR}/scripts/trends_cli.py" ingest --compact google-trends-output/input/web.compact.json google-trends-output/input/shopping.compact.json --terms "air fryer" "multicooker" --geo UA
    ```
-   The parser checks the series count against `--terms` and fails loudly on a mismatch.
+   For a service, add `--kind service` and collect `youtube` instead of `shopping`. The parser checks the series count against `--terms` and fails loudly on a mismatch. If `${CLAUDE_SKILL_DIR}` is unset, locate `trends_cli.py` as described in SKILL.md.
+   Quote the report this prints. Averages, shapes, regions and verdicts are not worked out by hand.
 6. Close any tab you opened.
 
 ## The snippet

@@ -224,10 +224,36 @@ def analyze_series(dates: list[str], values: list[int]) -> dict:
 
 
 # --- regions, related, compare ---------------------------------------------
-def top_regions(regions: list[dict], n: int = 5) -> dict:
-    with_data = [r for r in regions if r["value"] > 0]
-    out = {"top": with_data[:n], "regions_with_data": len(with_data), "notes": []}
-    if len(with_data) < 3:
+# Regions whose Trends values come from tiny samples and often jump to the top of the ranking.
+# They are left out of the ranking unless the user asks for everything (--all-regions).
+UNRELIABLE_REGION_CODES = {"UA-43", "UA-40"}  # Crimea, Sevastopol
+UNRELIABLE_REGION_WORDS = ("crimea", "sevastopol", "крим", "крым", "севастопол")
+
+
+def is_unreliable_region(region: dict) -> bool:
+    name = region.get("name", "").lower()
+    return region.get("code") in UNRELIABLE_REGION_CODES or any(w in name for w in UNRELIABLE_REGION_WORDS)
+
+
+def top_regions(regions: list[dict], n: int = 5, include_unreliable: bool = False) -> dict:
+    positive = sorted((r for r in regions if r["value"] > 0), key=lambda r: (-r["value"], r["name"]))
+    excluded = [] if include_unreliable else [r for r in positive if is_unreliable_region(r)]
+    reliable = [r for r in positive if include_unreliable or not is_unreliable_region(r)]
+    out: dict = {"top": [], "regions_with_data": len(reliable), "excluded": excluded, "notes": []}
+    peak = reliable[0]["value"] if reliable else 0
+    rescale = bool(excluded) and peak not in (0, 100)
+    for r in reliable[:n]:
+        item = dict(r)
+        if rescale:
+            item["raw_value"] = r["value"]
+            item["value"] = round(r["value"] * 100 / peak)
+        out["top"].append(item)
+    if excluded:
+        listed = ", ".join(f"{r['name']} ({r['value']})" for r in excluded)
+        out["notes"].append(f"left out as unreliable (tiny samples): {listed}")
+    if rescale:
+        out["notes"].append("values rescaled so the highest remaining region is 100; Google's raw values stay in regions.csv")
+    if len(reliable) < 3:
         out["notes"].append("fewer than 3 regions have data: the market is too small for a geo split")
     return out
 
@@ -236,13 +262,46 @@ _INTENT_PATTERNS = {
     "choose": r"\b(how to choose|which|best|top)\b|як обрати|як вибрати|який |кращ|найкращ|как выбрать|какой |лучш",
     "compare": r"\b(vs|versus|or|alternative)\b| чи | или |порівнян|сравнен",
     "review": r"\b(review|reviews|unboxing|worth it)\b|відгук|огляд|распаков|отзыв|обзор",
-    "buy": r"\b(buy|price|cost|cheap|sale|near me)\b|купити|ціна|де купити|купить|цена|где купить",
+    "buy": r"\b(buy|price|cost|cheap|sale|near me|order|hire|how much)\b|купити|ціна|де купити|купить|цена|где купить"
+           r"|заказать|замовити|сколько стоит|скільки коштує|стоимость|вартість",
+    "define": r"\b(what is|who is|meaning|definition|for beginners)\b|що таке|хто такий|кто такой|что такое"
+              r"|(^|\s)(це|это)(\s|$)|простыми словами|простими словами",
+    "career": r"\b(job|jobs|vacancy|vacancies|salary|career|course|courses|training|certification|internship)\b"
+              r"|ваканс|работа|робота|зарплат|курсы|курси|курсів|курсов|\bкурс\b|навчан|обучен|стажуван|стажиров|резюме",
 }
+MIX_TAGS = ("define", "career", "choose", "compare", "review", "buy")
 
 
 def tag_intent(query: str) -> list[str]:
     q = query.lower()
     return [tag for tag, pat in _INTENT_PATTERNS.items() if re.search(pat, q)]
+
+
+def intent_mix(related: dict) -> dict:
+    """Share of the TOP related-query weight (their 0-100 values) that carries each intent tag.
+
+    A query with several tags counts toward each of them, so shares can add up to more than 100%.
+    Tags are keyword heuristics (English, Ukrainian, Russian), not a classification of people."""
+    weights = {t: 0 for t in MIX_TAGS}
+    other = total = 0
+    top = related.get("top", [])
+    for item in top:
+        w = max(item.get("value") or 0, 0)
+        if not w:
+            continue
+        total += w
+        tags = tag_intent(item["query"])
+        if not tags:
+            other += w
+        for t in tags:
+            weights[t] += w
+    pct = (lambda w: round(w * 100 / total)) if total else (lambda w: 0)
+    rising_tags = {t: 0 for t in MIX_TAGS}
+    for item in related.get("rising", []):
+        for t in tag_intent(item["query"]):
+            rising_tags[t] += 1
+    return {"queries": len(top), "total_weight": total, "share": {t: pct(w) for t, w in weights.items()},
+            "other": pct(other), "rising_tags": rising_tags}
 
 
 def summarize_related(related: dict, limit: int = 10) -> dict:
@@ -357,6 +416,60 @@ def verdict(shape_info: dict, intent: dict, regions: dict | None, rising_count: 
     return {"label": label, "reasons": reasons, "caveats": caveats}
 
 
+SERVICE_LABELS = {
+    "growing": "demand_growing",
+    "stable": "demand_stable",
+    "seasonal": "demand_seasonal",
+    "declining": "demand_falling",
+    "fad": "demand_spiky",
+    "insufficient_data": "inconclusive",
+}
+
+
+def service_verdict(shape_info: dict, mix: dict | None, regions: dict | None, rising_count: int) -> dict:
+    """Reading for a service, profession or niche: what Google search interest does, nothing about launching."""
+    shape = shape_info["shape"]
+    reasons = list(shape_info.get("reasons", []))
+    if shape == "seasonal" and shape_info.get("timing"):
+        reasons.append(f"estimated next peak {shape_info['timing']['next_peak']}; preparation window starts 3-6 weeks before")
+    momentum = shape_info.get("momentum_3m")
+    if shape == "growing" and momentum is not None and momentum <= MOMENTUM_STALL:
+        reasons.append(f"watch: the last 3 months are {round((1 - momentum) * 100)}% below the 3 months before; check whether the rise is stalling")
+    if mix and mix["total_weight"]:
+        s = mix["share"]
+        reasons.append(f"top related queries by weight: definitions {s['define']}%, career/learning {s['career']}%, "
+                       f"buying words {s['buy']}%, no tag {mix['other']}%")
+    if regions and regions.get("regions_with_data", 0) >= 3:
+        reasons.append("top regions: " + ", ".join(r["name"] for r in regions["top"][:3]))
+    if rising_count:
+        reasons.append(f"{rising_count} rising related queries")
+    caveats = [
+        "Trends shows relative interest (0-100), not search volume: confirm volumes in Keyword Planner.",
+        "Trends covers Google search only: Instagram, Telegram, marketplaces, exchanges and referrals are not visible in it.",
+        "Search interest does not show paying demand: check ads and offers of competitors in Meta Ad Library and your own leads.",
+    ]
+    return {"label": SERVICE_LABELS[shape], "reasons": reasons, "caveats": caveats}
+
+
+def build_service_checklist(primary: dict, terms_count: int, regions: dict | None, rising_count: int,
+                           mix: dict | None) -> list[dict]:
+    shape = primary["shape"]
+    return [
+        {"item": "Checked the 5-year direction of search interest",
+         "status": "attention" if shape == "insufficient_data" else "done"},
+        {"item": "Determined the season, if there is one",
+         "status": "done" if primary.get("timing") else ("attention" if shape == "seasonal" else "n/a")},
+        {"item": "Compared wordings (languages, synonyms, spellings)", "status": "done" if terms_count >= 2 else "todo"},
+        {"item": "Read the mix of related queries (definitions, career/learning, buying words)",
+         "status": "done" if mix and mix["total_weight"] else "todo"},
+        {"item": "Listed top regions (unreliable regions left out)",
+         "status": "done" if regions and regions.get("regions_with_data", 0) >= 3 else "todo"},
+        {"item": "Collected rising queries", "status": "done" if rising_count else "todo"},
+        {"item": "Confirmed volumes in Keyword Planner and checked competitors and other channels with other sources",
+         "status": "manual"},
+    ]
+
+
 def build_checklist(primary: dict, terms_count: int, intent: dict, regions: dict | None, rising_count: int) -> list[dict]:
     """The guide's pre-launch checklist; the last item always needs a human."""
     shape = primary["shape"]
@@ -379,37 +492,51 @@ def build_checklist(primary: dict, terms_count: int, intent: dict, regions: dict
 
 
 # --- entry point ----------------------------------------------------------------
-def analyze_snapshot(snap: dict) -> dict:
+def analyze_snapshot(snap: dict, include_unreliable: bool = False) -> dict:
+    kind = snap["query"].get("kind", "product")
     web = snap["sources"].get("web", {})
     shop = snap["sources"].get("shopping", {})
     wtl, stl = web.get("timeline"), shop.get("timeline")
-    result: dict = {"terms": {}, "warnings": []}
+    result: dict = {"kind": kind, "terms": {}, "warnings": [], "unreliable_regions_left_out": not include_unreliable}
     if not wtl:
         result["warnings"].append("no web timeline in the snapshot")
         return result
 
     per_term = {lab: analyze_series(wtl["dates"], vals) for lab, vals in wtl["series"].items()}
+    if kind == "service":
+        stl = None  # Google Shopping is about products
     shop_term = {lab: analyze_series(stl["dates"], vals) for lab, vals in stl["series"].items()} if stl else {}
     comparison = compare_terms(per_term)
     result["comparison"] = comparison
 
     for lab, info in per_term.items():
-        intent = intent_check(
-            info, shop_term.get(lab),
-            (wtl["dates"], wtl["series"][lab]),
-            (stl["dates"], stl["series"][lab]) if stl and lab in stl["series"] else None,
-        )
-        reg = top_regions(web["regions"][lab]) if lab in web.get("regions", {}) else None
+        if kind == "service":
+            intent = {"status": "not_applicable", "note": "Google Shopping is about products; not used in service mode"}
+        else:
+            intent = intent_check(
+                info, shop_term.get(lab),
+                (wtl["dates"], wtl["series"][lab]),
+                (stl["dates"], stl["series"][lab]) if stl and lab in stl["series"] else None,
+            )
+        reg = top_regions(web["regions"][lab], include_unreliable=include_unreliable) if lab in web.get("regions", {}) else None
         rel = summarize_related(web["related"][lab]) if lab in web.get("related", {}) else None
+        mix = intent_mix(web["related"][lab]) if lab in web.get("related", {}) else None
         rising_count = len(rel["rising"]) if rel else 0
+        if kind == "service":
+            verdict_, checklist = (service_verdict(info, mix, reg, rising_count),
+                                   build_service_checklist(info, len(per_term), reg, rising_count, mix))
+        else:
+            verdict_, checklist = (verdict(info, intent, reg, rising_count),
+                                   build_checklist(info, len(per_term), intent, reg, rising_count))
         result["terms"][lab] = {
             "web": info,
             "shopping": shop_term.get(lab),
             "intent": intent,
             "regions": reg,
             "related": rel,
-            "verdict": verdict(info, intent, reg, rising_count),
-            "checklist": build_checklist(info, len(per_term), intent, reg, rising_count),
+            "intent_mix": mix,
+            "verdict": verdict_,
+            "checklist": checklist,
         }
     result["primary"] = comparison.get("recommended") or next(iter(per_term), None)
     # related queries from extra sources (YouTube, Images, News) - used for content ideas

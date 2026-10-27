@@ -13,11 +13,12 @@ from .texts import (
     INTENT_TEXT,
     NEXT_STEPS,
     PITFALLS,
-    SHAPE_TEXT,
+    SERVICE_LIMITS,
     VERDICT_TEXT,
     geo_label,
     marketplaces_for,
     month_name,
+    shape_text,
 )
 
 PALETTE = ["#2563eb", "#d97706", "#059669", "#9333ea", "#dc2626"]
@@ -29,7 +30,7 @@ CSS = """
 main{max-width:860px;margin:0 auto;padding:24px 16px 64px}h1{font-size:1.5rem;margin:0 0 4px}h2{font-size:1.15rem;margin:28px 0 8px}
 .meta{color:var(--muted);font-size:.9rem}.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin:12px 0}
 .badge{display:inline-block;padding:2px 10px;border-radius:999px;border:1px solid currentColor;font-weight:600;font-size:.9rem}
-.go_validate{color:var(--ok)}.test_small,.wait,.inconclusive{color:var(--warn)}.avoid{color:var(--bad)}
+.go_validate,.demand_growing{color:var(--ok)}.test_small,.wait,.inconclusive,.demand_stable,.demand_seasonal{color:var(--warn)}.avoid,.demand_falling,.demand_spiky{color:var(--bad)}
 table{border-collapse:collapse;width:100%;font-size:.95rem}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
 svg{width:100%;height:auto;display:block}.axis{stroke:var(--line)}.lbl{fill:var(--muted);font-size:11px}
 .legend span{display:inline-flex;align-items:center;gap:6px;margin-right:14px;font-size:.9rem}.legend i{width:12px;height:3px;display:inline-block}
@@ -73,6 +74,7 @@ def _rising_item(r: dict) -> str:
 
 def render(snap: dict, analysis: dict) -> str:
     q, terms = snap["query"], analysis["terms"]
+    kind = analysis.get("kind", "product")
     e = escape
     out = [
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">",
@@ -99,13 +101,13 @@ def render(snap: dict, analysis: dict) -> str:
     if len(terms) > 1 and comp.get("ranking"):
         rows = "".join(f"<tr><td>{e(r['term'])}</td><td>{e(r['shape'])}</td><td>{r['avg_last_12m']}</td>"
                        f"<td>{int(r['share_of_leader'] * 100)}%</td></tr>" for r in comp["ranking"])
-        out.append("<h2>Name comparison</h2><div class=\"card\"><table><tr><th>Term</th><th>Shape</th><th>Level (12m)</th>"
+        out.append(f"<h2>{'Wording' if kind == 'service' else 'Name'} comparison</h2><div class=\"card\"><table><tr><th>Term</th><th>Shape</th><th>Level (12m)</th>"
                    f"<th>Share of leader</th></tr>{rows}</table>"
                    + "".join(f"<p class=\"meta\">⚠ {e(w)}</p>" for w in comp.get("warnings", [])) + "</div>")
 
     for lab, t in terms.items():
         web = t["web"]
-        out.append(f"<h2>{e(lab)}</h2><div class=\"card\"><p><strong>{e(SHAPE_TEXT[web['shape']])}</strong></p>")
+        out.append(f"<h2>{e(lab)}</h2><div class=\"card\"><p><strong>{e(shape_text(web['shape'], kind))}</strong></p>")
         if web.get("yoy_ratio") is not None:
             out.append(f"<p>Year over year: ×{web['yoy_ratio']}</p>")
         seas, tm = web.get("seasonality"), web.get("timing")
@@ -113,11 +115,18 @@ def render(snap: dict, analysis: dict) -> str:
             out.append(f"<p>Peak around {e(month_name(seas['peak_month']))}; rise starts around {e(month_name(seas['rise_start_month']))}.</p>")
             if tm:
                 out.append(f"<p>Next peak (estimate) {e(tm['next_peak'])}; start ads between {e(tm['ads_start_from'])} and {e(tm['ads_start_until'])}.</p>")
-        if t["intent"]["status"] != "not_checked":
+        if t["intent"]["status"] not in ("not_checked", "not_applicable"):
             out.append(f"<p>Buying intent: {e(INTENT_TEXT[t['intent']['status']])}</p>")
+        mix = t.get("intent_mix")
+        if mix and mix["total_weight"]:
+            s = mix["share"]
+            out.append(f"<p>Related queries by intent (share of top-query weight): definitions {s['define']}%, career/learning "
+                       f"{s['career']}%, buying words {s['buy']}%, choose {s['choose']}%, compare {s['compare']}%, "
+                       f"reviews {s['review']}%, no tag {mix['other']}%</p>")
         reg = t.get("regions")
         if reg:
             out.append("<p>Top regions: " + e(", ".join(f"{r['name']} ({r['value']})" for r in reg["top"]) or "none") + "</p>")
+            out.extend(f"<p class=\"meta\">{e(n)}</p>" for n in reg["notes"])
         rel = t.get("related")
         if rel and rel["rising"]:
             items = "".join(_rising_item(r) for r in rel["rising"][:8])
@@ -125,11 +134,14 @@ def render(snap: dict, analysis: dict) -> str:
         out.append("</div>")
 
     if primary in terms:
-        out.append("<h2>Pre-launch checklist</h2><div class=\"card\"><ul>" + "".join(
+        out.append(f"<h2>{'Research' if kind == 'service' else 'Pre-launch'} checklist</h2><div class=\"card\"><ul>" + "".join(
             f"<li>{e(CHECK_MARK[c['status']])} {e(c['item'])}</li>" for c in terms[primary]["checklist"]) + "</ul></div>")
     links = "".join(f"<li>{e(what)}: <a href=\"{e(url)}\" rel=\"noopener noreferrer\">{e(name)}</a></li>" for what, name, url in NEXT_STEPS)
     links += "".join(f"<li>Prices: <a href=\"{e(u)}\" rel=\"noopener noreferrer\">{e(n)}</a></li>" for n, u in marketplaces_for(snap))
     out.append(f"<h2>Confirm with other sources</h2><div class=\"card\"><ul>{links}</ul></div>")
+    if kind == "service":
+        out.append("<h2>What Trends cannot show here</h2><div class=\"card\"><ul>"
+                   + "".join(f"<li>{e(s)}</li>" for s in SERVICE_LIMITS) + "</ul></div>")
     caveats = (terms[primary]["verdict"]["caveats"] if primary in terms else []) + PITFALLS
     out.append("<h2>Caveats</h2><div class=\"card\"><ul>" + "".join(f"<li>{e(c)}</li>" for c in caveats) + "</ul></div>")
     out.append("</main></body></html>")

@@ -27,9 +27,9 @@ def _read(path: Path) -> dict:
 
 
 def ingest_raw(raw_dir: Path, terms: list[str], geos: list[str], date_range: str,
-               origin: str, category: int = 0) -> dict:
+               origin: str, category: int = 0, kind: str = "product") -> dict:
     labels = series_labels(terms, geos)
-    snap = new_snapshot(terms, geos, date_range, origin, category)
+    snap = new_snapshot(terms, geos, date_range, origin, category, kind)
     for source in SOURCE_GPROP:
         folder = raw_dir / source
         if not folder.is_dir():

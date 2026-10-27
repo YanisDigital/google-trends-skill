@@ -33,6 +33,7 @@ def slugify(text: str, limit: int = 48) -> str:
 
 
 MAX_INPUT_BYTES = 5_000_000
+DEFAULT_OUTPUT_NAME = "google-trends-output"
 OUTPUT_GITIGNORE = "# Created by google-trends-skill: reports describe your research, keep them out of git.\n*\n"
 
 
@@ -49,7 +50,14 @@ def prepare_output_dir(out: Path) -> bool:
     in it, so reports never land in the user's own repository by accident. An existing folder is
     left as it is; returns whether it is protected by our .gitignore."""
     if out.exists():
-        return (out / ".gitignore").is_file()
+        gitignore = out / ".gitignore"
+        if gitignore.is_file():
+            return True
+        if out.name == DEFAULT_OUTPUT_NAME:
+            # our own dedicated folder (Claude may have created it to drop input files before the first run)
+            gitignore.write_text(OUTPUT_GITIGNORE, encoding="utf-8")
+            return True
+        return False
     out.mkdir(parents=True)
     (out / ".gitignore").write_text(OUTPUT_GITIGNORE, encoding="utf-8")
     return True

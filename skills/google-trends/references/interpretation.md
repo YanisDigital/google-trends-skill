@@ -33,6 +33,29 @@ Seasonal is checked before fad so that a yearly peak is never mistaken for a one
 
 A verdict is never "buy it". It says whether Trends supports the next step, and always carries two caveats: volumes are unknown, and competition and margin are unchecked.
 
+## Service mode readings
+
+For a service, profession or niche (`--kind service`) the shape rules are the same, but the label describes search interest only:
+
+| Label | Shape | Meaning |
+|---|---|---|
+| `demand_growing` | growing | search interest rose over the window |
+| `demand_stable` | stable | flat |
+| `demand_seasonal` | seasonal | peaks recur every year |
+| `demand_falling` | declining | search interest fell |
+| `demand_spiky` | fad | one peak, then a collapse |
+| `inconclusive` | insufficient data | too little to read |
+
+There is no launch verdict and no Shopping check. The reasons include the intent mix.
+
+## Intent mix of related queries
+
+The share of the weight of the TOP related queries (their 0-100 values) that carries each tag: `define` ("what is", "це", "это", "who is"), `career` (job, vacancy, salary, course, training and the Ukrainian and Russian equivalents), `buy` (price, order, hire, "how much" and equivalents), `choose`, `compare`, `review`. A query with several tags counts toward each, so the shares can add up to more than 100%; queries without a tag are reported as "no tag". Tags are keyword heuristics for English, Ukrainian and Russian, not a classification of people. Rising queries are counted per tag, not weighted.
+
+## Regions
+
+Trends shows relative values per region. Crimea and Sevastopol have tiny samples and often jump to the top, so the report leaves them out of the ranking and rescales the remaining regions so the highest is 100 (Google's raw values stay in `regions.csv`). `--all-regions` keeps them. The left-out regions are named in the report.
+
 ## Where Trends is the wrong tool
 
 - Market size or sales estimates.

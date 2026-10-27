@@ -20,7 +20,10 @@ Not affiliated with or endorsed by Google. "Google" and "Google Trends" are trad
 | Content and SEO | rising queries tagged choose / compare / review / buy; YouTube source |
 | Product demand | does Google Shopping confirm buying intent |
 | Brand and competitors | brand vs competitors, change since the last run |
+| Services, professions, niches | `--kind service`: the shape and season of search interest, the intent mix of related queries (definitions, career and learning, buying words), no launch verdict |
 | Export tests | one term across several countries |
+
+The numbers, shapes, rankings and verdicts always come from the scripts, not from the model's own arithmetic. Crimea and Sevastopol (tiny samples that jump to the top of the ranking) are left out of the region list by default; `--all-regions` shows them. Every run keeps its source data, a snapshot and the reports, so it can be reproduced and compared later.
 
 The workflow follows a 15-minute product check with a pre-launch checklist; the manual items (search volume, competition) stay unticked on purpose.
 

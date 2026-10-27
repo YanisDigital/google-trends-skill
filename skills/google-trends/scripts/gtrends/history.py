@@ -11,7 +11,8 @@ from .util import md_escape, read_text_capped, safe_join, slugify
 
 def slug_for(snap: dict) -> str:
     q = snap["query"]
-    return slugify(" ".join(q["terms"]) + " " + "-".join(g or "world" for g in q["geos"]) + " " + q["date"])
+    kind = " service" if q.get("kind") == "service" else ""  # product slugs stay as in earlier versions
+    return slugify(" ".join(q["terms"]) + " " + "-".join(g or "world" for g in q["geos"]) + " " + q["date"] + kind)
 
 
 def history_dir(out: Path, snap: dict) -> Path:
