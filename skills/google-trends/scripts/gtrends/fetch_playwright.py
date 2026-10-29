@@ -31,7 +31,14 @@ CONTEXT_OPTIONS = {
 
 
 class BlockedError(RuntimeError):
-    """Google showed a consent wall, CAPTCHA or rate limit. Use the manual CSV route instead."""
+    """Google showed a consent wall, CAPTCHA or rate limit. Use browser mode or the manual CSV route instead.
+
+    `retryable` is True only for a 429 on a data request after the page itself loaded; a blocked
+    explore page is final, because waiting never changed it."""
+
+    def __init__(self, message: str, retryable: bool = False):
+        super().__init__(message)
+        self.retryable = retryable
 
 
 def validate_inputs(terms: list[str], geos: list[str], date_range: str, sources: list[str]) -> None:
@@ -53,8 +60,8 @@ def validate_inputs(terms: list[str], geos: list[str], date_range: str, sources:
 
 def explore_url(terms: list[str], geos: list[str], date_range: str, source: str, category: int = 0) -> str:
     q = ",".join(urllib.parse.quote(t, safe="") for t in terms)
-    n = max(len(terms), len(geos))
-    geo_list = geos if len(geos) == n else geos * n
+    # one geo for all terms is written once (the form checked in a real browser); several geos go with one term
+    geo_list = geos if len(geos) > 1 else geos[:1]
     params = [f"q={q}", f"date={urllib.parse.quote(date_range, safe='')}", f"geo={','.join(geo_list)}", "hl=en"]
     if category:
         params.append(f"cat={int(category)}")
@@ -110,7 +117,7 @@ def _gather(ctx: dict) -> dict[str, str]:
         if "consent." in page.url or "/sorry/" in page.url:
             raise BlockedError("Google showed a consent or CAPTCHA page")
         if any(r.status == 429 and "/trends/api/" in r.url for r in seen):
-            raise BlockedError("HTTP 429 (rate limited)")
+            raise BlockedError("HTTP 429 (rate limited) on a data request", retryable=True)
         have_multiline = any("/widgetdata/multiline" in r.url and r.ok for r in seen)
         if len(seen) != last_count:
             last_count, last_change = len(seen), time.time()
@@ -173,9 +180,9 @@ def fetch(terms: list[str], geos: list[str], date_range: str, sources: list[str]
                         files = _gather(ctx)
                         break
                     except BlockedError as exc:
-                        if attempt == 2 or "429" not in str(exc):
+                        if attempt == 2 or not exc.retryable:
                             raise
-                        log("rate limited: waiting 60 s before one retry")
+                        log("rate limited on a data request: waiting 60 s before one retry")
                         time.sleep(60)
                     finally:
                         context.close()

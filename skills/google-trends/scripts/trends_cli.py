@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Command line entry point for the google-trends skill.
 
-  check       fetch via Playwright, analyse, write reports, save history
+  check       fetch via Playwright, analyse, write reports, save history (often blocked by Google)
+  links       explore links for exporting data by hand (5 terms per link), with the next steps
   ingest      build a snapshot from raw widget JSON or compact JSON (browser mode) and report
   import-csv  build a snapshot from CSV files exported by hand from Trends and report
   report      re-render reports from a saved snapshot
@@ -21,7 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from gtrends import compact, history, report_html, report_md, report_tables, trending  # noqa: E402
+from gtrends import compact, history, links, report_html, report_md, report_tables, trending  # noqa: E402
 from gtrends.analyze import analyze_snapshot  # noqa: E402
 from gtrends.fetch_playwright import BlockedError, fetch, validate_inputs  # noqa: E402
 from gtrends.ingest import ingest_raw  # noqa: E402
@@ -93,6 +94,24 @@ def _sources(a: argparse.Namespace) -> list[str]:
     return a.sources or (["web", "youtube"] if a.kind == "service" else ["web", "shopping"])
 
 
+def _manual_sources(a: argparse.Namespace) -> list[str]:
+    """Manual export covers what import-csv accepts: web search, plus Google Shopping for products."""
+    return a.sources or (["web"] if a.kind == "service" else ["web", "shopping"])
+
+
+def cmd_links(a: argparse.Namespace) -> int:
+    items = links.build_links(a.terms, a.geo, a.date, _manual_sources(a), a.category)
+    text = links.render_markdown(items, a.geo, a.kind)
+    print(text)
+    if a.save:
+        out = Path(a.out)
+        _prepare(out)
+        target = safe_join(out, "links.md")
+        target.write_text(text, encoding="utf-8")
+        print(f"Saved: {target}", file=sys.stderr)
+    return 0
+
+
 def cmd_check(a: argparse.Namespace) -> int:
     out = Path(a.out)
     sources = _sources(a)
@@ -100,8 +119,13 @@ def cmd_check(a: argparse.Namespace) -> int:
     _prepare(out)
     raw = safe_join(out, "raw", history.slugify(" ".join(a.terms) + " ".join(a.geo) + a.date), date.today().isoformat())
     raw.mkdir(parents=True, exist_ok=True)
-    fetch(a.terms, a.geo, a.date, sources, raw, category=a.category, headed=a.headed, delay_s=a.delay,
-          log=lambda m: print(m, file=sys.stderr))
+    try:
+        fetch(a.terms, a.geo, a.date, sources, raw, category=a.category, headed=a.headed, delay_s=a.delay,
+              log=lambda m: print(m, file=sys.stderr))
+    except BlockedError:
+        # be useful right away: print the links for exporting this very query by hand, then report the block
+        print(links.render_markdown(links.build_links(a.terms, a.geo, a.date, _manual_sources(a), a.category), a.geo, a.kind))
+        raise
     snap = ingest_raw(raw, a.terms, a.geo, a.date, "playwright", a.category, a.kind)
     print(f"Raw Google responses kept in: {raw}", file=sys.stderr)
     return finish(snap, out, _formats(a.formats), all_regions=a.all_regions)
@@ -180,6 +204,14 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--delay", type=float, default=8.0, help="seconds between pages (min 5)")
     c.set_defaults(fn=cmd_check)
 
+    k = sub.add_parser("links", help="explore links for exporting data by hand when collection is blocked")
+    common(k)
+    k.add_argument("--terms", nargs="+", required=True, help="any number of terms; more than 5 are split into several links")
+    k.add_argument("--sources", nargs="+", default=None, help="web shopping (default: web shopping; service: web)")
+    k.add_argument("--category", type=int, default=0)
+    k.add_argument("--save", action="store_true", help="also save links.md in the output folder")
+    k.set_defaults(fn=cmd_links)
+
     i = sub.add_parser("ingest", help="build a snapshot from raw widget JSON saved in browser mode")
     common(i)
     i.add_argument("--raw", help="folder with <source>/multiline.json etc.")
@@ -223,7 +255,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return args.fn(args)
     except BlockedError as exc:
-        print(f"BLOCKED: {exc}\nStop here. Export CSV files by hand from trends.google.com and use `import-csv`.",
+        print(f"BLOCKED: {exc}\n"
+              "Stop here and do not retry: Google often blocks automated browsers even when your own Chrome works.\n"
+              "Next: connect Claude in Chrome and use browser mode (references/browser-mode.md), or export CSV "
+              "by hand from the links above (`trends_cli.py links ...`) and run `import-csv`.",
               file=sys.stderr)
         return 3
     except (ParseError, ValueError, OSError, json.JSONDecodeError, RecursionError) as exc:

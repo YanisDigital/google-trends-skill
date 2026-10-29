@@ -91,7 +91,7 @@ def test_snapshot_is_json_serialisable():
 def test_explore_url_shape():
     url = explore_url(["air fryer", "мультипіч"], ["UA"], "today 5-y", "shopping")
     assert url.startswith("https://trends.google.com/trends/explore?")
-    assert "gprop=froogle" in url and "geo=UA,UA" in url and "hl=en" in url
+    assert "gprop=froogle" in url and "geo=UA&" in url and "geo=UA,UA" not in url and "hl=en" in url
     assert "%D0%BC" in url  # non-ASCII term is percent-encoded
 
 

@@ -5,7 +5,7 @@
 ## Setup (ask the user first)
 
 ```bash
-pip install -r requirements.txt
+pip install -r <skill folder>/scripts/requirements.txt
 python -m playwright install chromium
 ```
 
@@ -14,6 +14,7 @@ python -m playwright install chromium
 | Command | Purpose |
 |---|---|
 | `check --terms A B --geo UA --date "today 5-y" --sources web shopping` | open the explore page, record the widget data, analyse, report |
+| `links --terms A B C D E F --geo UA` | print explore links for exporting CSV by hand (more than 5 terms are split into several links, each its own chart); `--save` writes `links.md` |
 | `ingest --compact web.compact.json [shopping.compact.json] --terms A B --geo UA` | build a snapshot from the compact JSON that the [browser mode](browser-mode.md) snippet returns (`--raw DIR` takes raw widget files instead) |
 | `import-csv --web-timeline f.csv [--shopping-timeline f.csv] [--regions f.csv] [--related "A=f.csv"]` | build a snapshot from CSV files exported by hand |
 | `report SNAPSHOT.json` | re-render reports from a saved snapshot |
@@ -29,14 +30,14 @@ Exit codes: `0` ok, `2` invalid input or unreadable file, `3` blocked by Google 
 - Opens `trends.google.com/trends/explore?...&hl=en` once per source in a fresh, throwaway browser profile.
 - Blocks every request that is not to Google, and images, media and fonts. Service workers are blocked (their requests would bypass the filter) and downloads are refused.
 - Records the three data responses the page itself requests (time series, regions, related queries). No private endpoints, no tokens of its own.
-- Waits at least 5 seconds between pages, retries once after a 429, then stops.
+- Waits at least 5 seconds between pages. A blocked explore page (HTTP 429, consent, CAPTCHA) ends the run at once with exit code 3 and prints the manual-export links; only a 429 on a data request after the page loaded gets one retry after 60 seconds.
 - Does **not** log in, accept cookies on the user's behalf, solve CAPTCHAs, rotate proxies or change its identity. If Google blocks it, the run ends with exit code 3.
 
 ## When blocked (HTTP 429, consent page, CAPTCHA)
 
 Automated clients get HTTP 429 from the explore page often, even when the same page opens fine in the user's own Chrome. Do not retry in a loop. Tell the user and either use [browser mode](browser-mode.md) with Claude in Chrome (the user's real browser), or manual CSV:
 
-1. Open the explore page yourself with `hl=en` in the URL (see [url-parameters.md](url-parameters.md)).
+1. Run `trends_cli.py links --terms ... --geo UA` to get the explore links (5 terms per link; each link is its own chart, so compare numbers only inside one), or build them from [url-parameters.md](url-parameters.md), and open each in your own browser.
 2. For web search, click the download arrow on **Interest over time** and save `multiTimeline.csv`.
 3. Change the source to **Google Shopping** and download its `multiTimeline.csv` again under another name.
 4. Optional: download **Interest by region** (`geoMap.csv`) and **Related queries** (`relatedQueries.csv`, one per term, the interface language must be English).

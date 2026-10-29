@@ -72,15 +72,15 @@ All modes are in [tasks.md](references/tasks.md).
 
 ### 3. Collect data
 
-`trends_cli.py` below means `python <skill folder>/scripts/trends_cli.py`. In Claude Code `${CLAUDE_SKILL_DIR}` is the skill folder. Where it is unset (the Claude app), find the file once: `find / -name trends_cli.py -path "*google-trends*" 2>/dev/null | head -1`. The analysis, Markdown, HTML and CSV reports need only the standard library; `pip install -r requirements.txt` adds Playwright and XLSX support, and `python -m playwright install chromium` is only for `check`.
+`trends_cli.py` below means `python <skill folder>/scripts/trends_cli.py`. In Claude Code `${CLAUDE_SKILL_DIR}` is the skill folder. Where it is unset (the Claude app), find the file once: `find / -name trends_cli.py -path "*google-trends*" 2>/dev/null | head -1`. The analysis, Markdown, HTML and CSV reports need only the standard library; `pip install -r <skill folder>/scripts/requirements.txt` adds Playwright and XLSX support, and `python -m playwright install chromium` is only for `check`.
 
-Pick the first path that works:
+Choose the path in this order:
 
-1. **CLI** - repeatable and batch checks: `trends_cli.py check --terms "air fryer" "multicooker" --geo UA` (add `--kind service` for a service).
-2. **Browser mode with the user's Chrome** (Claude in Chrome) - Google often returns HTTP 429 to automated browsers and built-in browser panes while the user's own Chrome works. Claude opens the explore page, runs a short snippet, saves the returned object to `google-trends-output/input/<source>.compact.json` and runs `ingest --compact`. See [browser-mode.md](references/browser-mode.md).
-3. **Manual CSV** - the user exports CSV files from trends.google.com and you run `import-csv`. See [cli-mode.md](references/cli-mode.md).
+1. **Is Claude in Chrome connected?** Check first: call `list_connected_browsers`. If a browser is listed, use **browser mode**: Google often returns HTTP 429 to automated browsers and built-in browser panes while the user's own Chrome works. Claude opens the explore page, runs a short snippet, saves the returned object to `google-trends-output/input/<source>.compact.json` and runs `ingest --compact`. Say once before the first run that signed-in searches are linked to the user's Google account (see the rules above). See [browser-mode.md](references/browser-mode.md).
+2. **No browser listed, or the tool is missing.** Do not start with the CLI. Tell the user in one message: connect Claude in Chrome (a profile that is not signed in to Google if they mind), or export CSV by hand. Offer `trends_cli.py links --terms ... --geo ...`: it prints the explore links (5 terms per link) and the export steps, and then you run `import-csv`. See [cli-mode.md](references/cli-mode.md).
+3. **CLI** (`trends_cli.py check --terms "air fryer" "multicooker" --geo UA`, add `--kind service` for a service) only on a machine where it has worked before, or when the user asks for it. Elsewhere expect HTTP 429. A blocked page ends the run at once, without waiting: `check` prints the manual-export links and exits with code 3, and you go to 1 or 2. Never retry.
 
-If the CLI reports `BLOCKED`, go straight to 2 or 3: do not retry. Run `trends_cli.py <command> --help` for flags. URL parameters: [url-parameters.md](references/url-parameters.md).
+Run `trends_cli.py <command> --help` for flags. URL parameters: [url-parameters.md](references/url-parameters.md).
 
 ### 4. Analyse
 

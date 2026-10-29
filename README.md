@@ -106,6 +106,7 @@ Or run the CLI yourself:
 ```bash
 python skills/google-trends/scripts/trends_cli.py check --terms "air fryer" "multicooker" --geo UA --sources web shopping
 python skills/google-trends/scripts/trends_cli.py trending --geo UA
+python skills/google-trends/scripts/trends_cli.py links --terms "air fryer" "multicooker" --geo UA   # links for exporting CSV by hand
 python skills/google-trends/scripts/trends_cli.py import-csv --web-timeline multiTimeline.csv --geo UA
 ```
 
