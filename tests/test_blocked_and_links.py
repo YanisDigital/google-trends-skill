@@ -185,3 +185,15 @@ def test_docs_name_the_right_requirements_path():
         text = doc.read_text(encoding="utf-8")
         assert "pip install -r requirements.txt" not in text and "scripts/requirements.txt" in text
     assert "list_connected_browsers" in (root / "SKILL.md").read_text(encoding="utf-8")
+
+
+def test_docs_explain_how_to_get_chrome_running_and_to_check_again():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1] / "skills" / "google-trends"
+    skill = (root / "SKILL.md").read_text(encoding="utf-8")
+    browser = (root / "references" / "browser-mode.md").read_text(encoding="utf-8")
+    # an empty list is read as "extension not running", the user is told what to do, and the check is repeated
+    assert "deferred" in skill and "list_connected_browsers` again" in skill and "[]" in skill and "icon" in skill
+    assert "Do not start with the CLI" in skill
+    assert browser.index("0. **Check the connection.**") < browser.index("1. **Open the page.**")
+    assert "deferred" in browser and "list_connected_browsers` again" in browser and "links" in browser
