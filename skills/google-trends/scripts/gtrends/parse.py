@@ -310,7 +310,7 @@ def _is_int(v: object) -> bool:
 
 
 def _check_day(value: object, what: str) -> None:
-    if not isinstance(value, str) or not ISO_DAY_RE.match(value):
+    if not isinstance(value, str) or not ISO_DAY_RE.fullmatch(value):
         _fail(f"{what} must be a YYYY-MM-DD string")
     try:
         date.fromisoformat(value)
@@ -339,9 +339,9 @@ def validate_snapshot(snap: dict) -> None:
         _fail(f"'query.terms' must hold 1-{MAX_TERMS} terms")
     for t in terms:
         _check_label(t, "a term")
-    if not isinstance(geos, list) or len(geos) > MAX_TERMS or not all(isinstance(g, str) and GEO_RE.match(g) for g in geos):
+    if not isinstance(geos, list) or len(geos) > MAX_TERMS or not all(isinstance(g, str) and GEO_RE.fullmatch(g) for g in geos):
         _fail("'query.geos' must be country/region codes such as UA or US-CA")
-    if not isinstance(q.get("date"), str) or not DATE_RANGE_RE.match(q["date"]):
+    if not isinstance(q.get("date"), str) or not DATE_RANGE_RE.fullmatch(q["date"]):
         _fail("'query.date' must look like 'today 5-y'")
     if not _is_int(q.get("category", 0)):
         _fail("'query.category' must be an integer")

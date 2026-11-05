@@ -17,7 +17,7 @@ HT = "{https://trends.google.com/trending/rss}"
 
 def feed_url(geo: str) -> str:
     geo = geo.strip().upper()
-    if not _GEO_RE.match(geo):
+    if not _GEO_RE.fullmatch(geo):
         raise ValueError(f"invalid geo code: {geo!r} (expected e.g. UA, US, DE)")
     return f"https://{HOST}/trending/rss?" + urllib.parse.urlencode({"geo": geo})
 

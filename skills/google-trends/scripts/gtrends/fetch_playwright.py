@@ -47,11 +47,11 @@ def validate_inputs(terms: list[str], geos: list[str], date_range: str, sources:
     for t in terms:
         if not t.strip() or len(t) > 100 or "," in t or any(ord(c) < 32 for c in t):
             raise ValueError(f"invalid term {t!r}: 1-100 characters, no commas or control characters")
-    if not geos or len(geos) > MAX_TERMS or any(not GEO_RE.match(g) for g in geos):
+    if not geos or len(geos) > MAX_TERMS or any(not GEO_RE.fullmatch(g) for g in geos):
         raise ValueError("geo must look like UA, US or US-CA (empty = worldwide)")
     if len(geos) > 1 and len(terms) != 1:
         raise ValueError("compare either several terms in one geo or one term in several geos")
-    if not DATE_RANGE_RE.match(date_range):
+    if not DATE_RANGE_RE.fullmatch(date_range):
         raise ValueError(f"unsupported date range {date_range!r} (e.g. 'today 5-y', 'today 12-m')")
     bad = [s for s in sources if s not in SOURCE_GPROP]
     if bad:
@@ -62,7 +62,8 @@ def explore_url(terms: list[str], geos: list[str], date_range: str, source: str,
     q = ",".join(urllib.parse.quote(t, safe="") for t in terms)
     # one geo for all terms is written once (the form checked in a real browser); several geos go with one term
     geo_list = geos if len(geos) > 1 else geos[:1]
-    params = [f"q={q}", f"date={urllib.parse.quote(date_range, safe='')}", f"geo={','.join(geo_list)}", "hl=en"]
+    geo = ",".join(urllib.parse.quote(g, safe="") for g in geo_list)
+    params = [f"q={q}", f"date={urllib.parse.quote(date_range, safe='')}", f"geo={geo}", "hl=en"]
     if category:
         params.append(f"cat={int(category)}")
     if SOURCE_GPROP[source]:

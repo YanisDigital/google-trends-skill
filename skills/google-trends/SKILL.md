@@ -72,7 +72,7 @@ All modes are in [tasks.md](references/tasks.md).
 
 ### 3. Collect data
 
-`trends_cli.py` below means `python <skill folder>/scripts/trends_cli.py`. In Claude Code `${CLAUDE_SKILL_DIR}` is the skill folder. Where it is unset (the Claude app), find the file once: `find / -name trends_cli.py -path "*google-trends*" 2>/dev/null | head -1`. The analysis, Markdown, HTML and CSV reports need only the standard library; `pip install -r <skill folder>/scripts/requirements.txt` adds Playwright and XLSX support, and `python -m playwright install chromium` is only for `check`.
+`trends_cli.py` below means `python <skill folder>/scripts/trends_cli.py`. In Claude Code `${CLAUDE_SKILL_DIR}` is the skill folder. Where it is unset (the Claude app), find the file once, only where skills are installed: `find ~/.claude /mnt -maxdepth 8 -name trends_cli.py -path "*google-trends*" 2>/dev/null | head -1`. Do not search the whole disk; if nothing is found, ask the user where the skill is. The analysis, Markdown, HTML and CSV reports need only the standard library; `pip install -r <skill folder>/scripts/requirements.txt` adds Playwright and XLSX support, and `python -m playwright install chromium` is only for `check`.
 
 Choose the path in this order:
 
